@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 
 /**
  * Open-Meteo API 响应模型。
- * 文档: https://open-meteo.com/en/docs
  */
 @Serializable
 data class OpenMeteoResponse(
@@ -14,6 +13,7 @@ data class OpenMeteoResponse(
     val current: OpenMeteoCurrent? = null,
     val hourly: OpenMeteoHourly? = null,
     val daily: OpenMeteoDaily? = null,
+    @SerialName("minutely_15") val minutely15: OpenMeteoMinutely15? = null,
 )
 
 @Serializable
@@ -42,11 +42,19 @@ data class OpenMeteoDaily(
     @SerialName("temperature_2m_min") val temperatureMin: List<Double>,
     @SerialName("uv_index_max") val uvIndexMax: List<Double>,
     @SerialName("wind_speed_10m_max") val windSpeedMax: List<Double>,
+    val sunrise: List<String> = emptyList(),
+    val sunset: List<String> = emptyList(),
+)
+
+/** 15 分钟级降水数据 */
+@Serializable
+data class OpenMeteoMinutely15(
+    val time: List<String> = emptyList(),
+    val precipitation: List<Double> = emptyList(),
 )
 
 /**
  * Open-Meteo Geocoding API 响应模型。
- * 文档: https://open-meteo.com/en/docs/geocoding-api
  */
 @Serializable
 data class GeocodingResponse(
@@ -61,5 +69,5 @@ data class GeocodingResult(
     val longitude: Double,
     val country: String? = null,
     @SerialName("country_code") val countryCode: String? = null,
-    val admin1: String? = null, // 省/州
+    val admin1: String? = null,
 )

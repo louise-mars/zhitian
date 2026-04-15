@@ -92,4 +92,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)
     ksp(libs.hilt.work.compiler)
+
+    // Splash Screen
+    implementation(libs.splash.screen)
 }

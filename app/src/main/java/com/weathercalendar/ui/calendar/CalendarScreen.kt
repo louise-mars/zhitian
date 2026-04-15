@@ -93,6 +93,7 @@ fun CalendarScreen(
     onNextMonth: () -> Unit = {},
     onAddEvent: (LocalDate, String, java.time.LocalTime?) -> Unit = { _, _, _ -> },
     onDeleteEvent: (Long) -> Unit = {},
+    onUpdateEvent: (Long, LocalDate, String, java.time.LocalTime?) -> Unit = { _, _, _, _ -> },
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -227,6 +228,7 @@ fun CalendarScreen(
                     events = todayEvents[selectedDate] ?: emptyList(),
                     onAddEvent = { title, time -> onAddEvent(selectedDate!!, title, time) },
                     onDeleteEvent = onDeleteEvent,
+                    onUpdateEvent = { id, title, time -> onUpdateEvent(id, selectedDate!!, title, time) },
                 )
             }
         }
@@ -486,9 +488,12 @@ private fun DayDetailContent(
     events: List<CalendarEvent>,
     onAddEvent: (String, java.time.LocalTime?) -> Unit = { _, _ -> },
     onDeleteEvent: (Long) -> Unit = {},
+    onUpdateEvent: (Long, String, java.time.LocalTime?) -> Unit = { _, _, _ -> },
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var newEventTitle by remember { mutableStateOf("") }
+    var editingEventId by remember { mutableStateOf<Long?>(null) }
+    var editingTitle by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -587,6 +592,10 @@ private fun DayDetailContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable {
+                            editingEventId = event.id
+                            editingTitle = event.title
+                        }
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -603,16 +612,49 @@ private fun DayDetailContent(
                         color = Color.White.copy(alpha = 0.5f),
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text(
-                        text = event.title,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    // 删除按钮（只对 App 内事件显示，id > 0 且非系统日历）
+
+                    if (editingEventId == event.id) {
+                        // 编辑模式
+                        androidx.compose.material3.OutlinedTextField(
+                            value = editingTitle,
+                            onValueChange = { editingTitle = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF4FC3F7),
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                                cursorColor = Color(0xFF4FC3F7),
+                            ),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "✓",
+                            fontSize = 16.sp,
+                            color = Color(0xFF4FC3F7),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                if (editingTitle.isNotBlank()) {
+                                    onUpdateEvent(event.id, editingTitle.trim(), event.time)
+                                    editingEventId = null
+                                }
+                            },
+                        )
+                    } else {
+                        // 显示模式
+                        Text(
+                            text = event.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    // 删除按钮
                     Text(
                         text = "✕",
                         fontSize = 14.sp,

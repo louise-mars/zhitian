@@ -204,7 +204,14 @@ class CalendarViewModel @Inject constructor(
     fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null) {
         viewModelScope.launch {
             eventRepository.addEvent(title = title, date = date, time = time)
-            // 清除缓存并重新加载当前月
+            monthCache.clear()
+            loadMonth(_uiState.value.currentMonth)
+        }
+    }
+
+    fun updateEvent(id: Long, title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null) {
+        viewModelScope.launch {
+            eventRepository.updateEvent(id = id, title = title, date = date, time = time)
             monthCache.clear()
             loadMonth(_uiState.value.currentMonth)
         }

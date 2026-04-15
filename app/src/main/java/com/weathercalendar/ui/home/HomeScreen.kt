@@ -50,6 +50,7 @@ import com.weathercalendar.data.mock.MockData
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DayInfo
 import com.weathercalendar.data.model.HourlyForecast
+import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.repository.TemperatureUnit
@@ -67,6 +68,7 @@ fun HomeScreen(
     hourlyForecast: List<HourlyForecast>,
     threeDays: List<DayInfo>,
     weatherDetails: WeatherDetails,
+    rainForecast: RainForecast? = null,
     isLoading: Boolean = false,
     error: String? = null,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
@@ -186,8 +188,23 @@ fun HomeScreen(
                             Spacer(Modifier.height(24.dp))
                         }
 
+                        // ── 分钟级降雨预报 ──
+                        if (rainForecast != null) {
+                            RainForecastCard(
+                                rainForecast = rainForecast,
+                                textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(16.dp))
+                        }
+
                         if (threeDays.isNotEmpty()) {
                             SectionLabel("7日预报", textColor)
+                            Spacer(Modifier.height(8.dp))
+                            TemperatureChart(
+                                days = threeDays,
+                                textColor = textColor,
+                            )
                             Spacer(Modifier.height(12.dp))
                             DailyWeatherCalendarCard(
                                 days = threeDays,
@@ -199,6 +216,25 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.height(24.dp))
                         }
+
+                        // ── 生活指数 ──
+                        LifeIndexCard(
+                            currentWeather = currentWeather,
+                            todayInfo = threeDays.firstOrNull(),
+                            windSpeed = weatherDetails.windSpeed,
+                            textColor = textColor,
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+                        Spacer(Modifier.height(16.dp))
+
+                        // ── 日出日落 ──
+                        SunriseSunsetCard(
+                            sunrise = weatherDetails.sunrise,
+                            sunset = weatherDetails.sunset,
+                            textColor = textColor,
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+                        Spacer(Modifier.height(16.dp))
 
                         ExpandableDetailsCard(
                             details = weatherDetails,

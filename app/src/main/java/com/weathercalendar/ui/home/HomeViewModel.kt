@@ -1,11 +1,13 @@
 package com.weathercalendar.ui.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.weathercalendar.data.location.LocationService
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DayInfo
 import com.weathercalendar.data.model.HourlyForecast
+import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.repository.CalendarRepository
@@ -13,11 +15,14 @@ import com.weathercalendar.data.repository.CityRepository
 import com.weathercalendar.data.repository.EventRepository
 import com.weathercalendar.data.repository.SavedCity
 import com.weathercalendar.data.repository.TemperatureUnit
+import com.weathercalendar.data.repository.UserPrefs
 import com.weathercalendar.data.repository.UserPrefsRepository
+import com.weathercalendar.data.repository.WeatherData
 import com.weathercalendar.data.repository.WeatherRepository
 import com.weathercalendar.util.LunarCalendar
 import com.weathercalendar.widget.WeatherWidgetDataProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +45,7 @@ data class HomeUiState(
     val hourlyForecast: List<HourlyForecast> = emptyList(),
     val threeDays: List<DayInfo> = emptyList(),
     val weatherDetails: WeatherDetails = WeatherDetails(0, 0, "—", "—"),
+    val rainForecast: RainForecast? = null,
     val fromCache: Boolean = false,
     val tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
 )
@@ -52,90 +58,102 @@ class HomeViewModel @Inject constructor(
     private val userPrefsRepository: UserPrefsRepository,
     private val locationService: LocationService,
     private val eventRepository: EventRepository,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private val prefs get() =
+        appContext.getSharedPreferences("user_prefs_fallback", Context.MODE_PRIVATE)
+
     init {
         loadData()
     }
 
+    /**
+     * 两阶段加载：
+     * 1. 瞬间：用历史坐标 + Room 缓存立即渲染（isLoading = false）
+     * 2. 后台：GPS 定位 + API 刷新，完成后静默更新 UI
+     */
     fun loadData() {
+        val today = LocalDate.now()
+        val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINESE)
+        val dateText = today.format(DateTimeFormatter.ofPattern("M月d日")) + " $dayOfWeek"
+        val lunarText = LunarCalendar.getDisplayText(today)
+        _uiState.update { it.copy(dateText = dateText, lunarText = lunarText, error = null) }
+
+        // ── 阶段一：瞬间渲染缓存数据 ──
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            // 更新日期和农历
-            val today = LocalDate.now()
-            val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINESE)
-            val dateText = today.format(DateTimeFormatter.ofPattern("M月d日")) + " $dayOfWeek"
-            val lunarText = LunarCalendar.getDisplayText(today)
-            _uiState.update { it.copy(dateText = dateText, lunarText = lunarText) }
-
-            val savedCity = cityRepository.selectedCity.first()
             val userPrefs = userPrefsRepository.prefs.first()
+            val savedCity = cityRepository.selectedCity.first()
 
-            // ── 快速启动：先用历史位置显示缓存数据 ──
-            val lastLat = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
-                .getString("widget_city_lat", null)?.toDoubleOrNull()
-            val lastLon = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
-                .getString("widget_city_lon", null)?.toDoubleOrNull()
-            val lastCity = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
-                .getString("widget_city_name", null)
+            // 确定快速坐标（不等 GPS）
+            val quickLat: Double?
+            val quickLon: Double?
+            val quickCity: String?
 
-            // 如果有历史位置，先用缓存数据快速渲染
-            if (lastLat != null && lastLon != null && lastCity != null && savedCity == null) {
-                _uiState.update { it.copy(cityName = lastCity) }
-                val cachedResult = weatherRepository.getWeather(lastLat, lastLon)
+            if (savedCity != null && savedCity.name.isNotEmpty()) {
+                quickLat = savedCity.latitude
+                quickLon = savedCity.longitude
+                quickCity = savedCity.name
+            } else {
+                quickLat = prefs.getString("widget_city_lat", null)?.toDoubleOrNull()
+                quickLon = prefs.getString("widget_city_lon", null)?.toDoubleOrNull()
+                quickCity = prefs.getString("widget_city_name", null)
+            }
+
+            if (quickLat != null && quickLon != null && quickCity != null) {
+                _uiState.update { it.copy(cityName = quickCity) }
+                val cachedResult = weatherRepository.getWeather(quickLat, quickLon)
                 cachedResult.getOrNull()?.let { weatherData ->
-                    showWeatherData(weatherData, today, userPrefs)
+                    renderWeatherData(weatherData, today, userPrefs)
+                    // 阶段一完成，UI 已经有内容了
                 }
             }
 
-            // ── 确定最新坐标 ──
-            val lat: Double
-            val lon: Double
-            val cityName: String
+            // ── 阶段二：后台静默刷新 ──
+            val freshLat: Double
+            val freshLon: Double
+            val freshCity: String
 
             if (savedCity != null && savedCity.name.isNotEmpty()) {
-                lat = savedCity.latitude
-                lon = savedCity.longitude
-                cityName = savedCity.name
+                // 已选城市，不需要 GPS
+                freshLat = savedCity.latitude
+                freshLon = savedCity.longitude
+                freshCity = savedCity.name
             } else if (userPrefs.useLocation) {
+                // 后台 GPS 定位
                 val locationResult = locationService.getCurrentLocation()
                 val location = locationResult.getOrNull()
                 if (location != null) {
-                    lat = location.latitude
-                    lon = location.longitude
-                    cityName = location.cityName
+                    freshLat = location.latitude
+                    freshLon = location.longitude
+                    freshCity = location.cityName
+                } else if (quickLat != null && quickLon != null && quickCity != null) {
+                    // GPS 失败，继续用历史位置
+                    freshLat = quickLat
+                    freshLon = quickLon
+                    freshCity = quickCity
                 } else {
-                    // 定位失败 → 如果有历史位置就用历史，否则用默认
-                    if (lastLat != null && lastLon != null && lastCity != null) {
-                        lat = lastLat
-                        lon = lastLon
-                        cityName = lastCity
-                    } else {
-                        lat = userPrefs.defaultCityLat
-                        lon = userPrefs.defaultCityLon
-                        cityName = userPrefs.defaultCityName
-                    }
+                    freshLat = userPrefs.defaultCityLat
+                    freshLon = userPrefs.defaultCityLon
+                    freshCity = userPrefs.defaultCityName
                 }
             } else {
-                lat = userPrefs.defaultCityLat
-                lon = userPrefs.defaultCityLon
-                cityName = userPrefs.defaultCityName
+                freshLat = userPrefs.defaultCityLat
+                freshLon = userPrefs.defaultCityLon
+                freshCity = userPrefs.defaultCityName
             }
 
-            _uiState.update { it.copy(cityName = cityName) }
+            // 保存最新位置
+            WeatherWidgetDataProvider.saveCityForWidget(appContext, freshCity, freshLat, freshLon)
+            _uiState.update { it.copy(cityName = freshCity) }
 
-            // 同步城市信息给 Widget
-            WeatherWidgetDataProvider.saveCityForWidget(appContext, cityName, lat, lon)
-
-            // 获取天气（缓存优先）
-            val weatherResult = weatherRepository.getWeather(lat, lon)
+            // 获取最新天气
+            val weatherResult = weatherRepository.getWeather(freshLat, freshLon)
             val weatherData = weatherResult.getOrElse { e ->
-                // 如果已经有缓存数据在显示，不覆盖为错误
+                // 如果阶段一已经有数据，静默失败
                 if (_uiState.value.hourlyForecast.isNotEmpty()) {
                     _uiState.update { it.copy(isLoading = false) }
                     return@launch
@@ -146,39 +164,38 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
-            showWeatherData(weatherData, today, userPrefs)
+            renderWeatherData(weatherData, today, userPrefs)
         }
     }
 
-    private suspend fun showWeatherData(
-        weatherData: com.weathercalendar.data.repository.WeatherData,
+    private suspend fun renderWeatherData(
+        weatherData: WeatherData,
         today: LocalDate,
-        userPrefs: com.weathercalendar.data.repository.UserPrefs,
+        userPrefs: UserPrefs,
     ) {
-        // 获取日历事件（7天）
         val endDate = today.plusDays(6)
+
+        // 系统日历事件
         val eventsMap = try {
             calendarRepository.getEventsGroupedByDate(today, endDate)
         } catch (_: Exception) {
             emptyMap()
         }
 
-        // 获取 App 内事件
-        val appEvents = try {
-            eventRepository.getEventsBetween(today, endDate)
+        // App 内事件
+        val appEventsMap = try {
+            eventRepository.getEventsBetween(today, endDate).groupBy { it.date }
         } catch (_: Exception) {
-            emptyList()
+            emptyMap()
         }
-        val appEventsMap = appEvents.groupBy { it.date }
 
-        // 合并系统日历事件和 App 内事件
+        // 合并事件
         val allDates = (eventsMap.keys + appEventsMap.keys).toSet()
         val mergedEventsMap = allDates.associateWith { date ->
             (eventsMap[date] ?: emptyList()) + (appEventsMap[date] ?: emptyList())
         }
 
-        // 构建 7 天融合数据
-        val threeDays = weatherData.daily.take(7).map { daily ->
+        val days = weatherData.daily.take(7).map { daily ->
             val dayEvents = mergedEventsMap[daily.date] ?: emptyList()
             DayInfo(
                 date = daily.date,
@@ -195,8 +212,9 @@ class HomeViewModel @Inject constructor(
                 isLoading = false,
                 currentWeather = weatherData.current,
                 hourlyForecast = weatherData.hourly,
-                threeDays = threeDays,
+                threeDays = days,
                 weatherDetails = weatherData.details,
+                rainForecast = weatherData.rainForecast,
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,
             )

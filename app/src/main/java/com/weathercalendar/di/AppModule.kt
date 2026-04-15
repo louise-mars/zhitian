@@ -127,7 +127,7 @@ object AppModule {
             AppDatabase::class.java,
             "weather_calendar.db",
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_1_2)
             .build()
     }
 

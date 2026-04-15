@@ -53,6 +53,16 @@ data class WeatherDetails(
     val windSpeed: Int,
     val uvIndex: String,
     val airQuality: String,
+    val sunrise: String = "",
+    val sunset: String = "",
+)
+
+/** 分钟级降雨预报 */
+data class RainForecast(
+    val summary: String,          // "32 分钟后开始下雨"
+    val isRaining: Boolean,       // 当前是否在下雨
+    val minutesToRain: Int?,      // 几分钟后下雨（null = 2 小时内无雨）
+    val minutesToStop: Int?,      // 几分钟后停雨（null = 不会停）
 )
 
 // ─────────────────────────────────────────────

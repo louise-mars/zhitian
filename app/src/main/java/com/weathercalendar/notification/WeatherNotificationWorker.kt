@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit
  * 通知类型：
  * 1. 明天有雨/雪 → "记得带伞"
  * 2. 温差 > 10° → "注意穿衣"
+ * 3. 日程+天气联动 → "明天有会议且下雨，建议提前出门"
  */
 class WeatherNotificationWorker(
     private val context: Context,
@@ -49,12 +50,10 @@ class WeatherNotificationWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            // 检查用户是否开启了通知
             val prefs = context.getSharedPreferences("user_prefs_fallback", Context.MODE_PRIVATE)
             val notificationEnabled = prefs.getBoolean("weather_notification", false)
             if (!notificationEnabled) return Result.success()
 
-            // 读 Room 缓存
             val cityLat = prefs.getString("widget_city_lat", null)?.toDoubleOrNull() ?: 39.9042
             val cityLon = prefs.getString("widget_city_lon", null)?.toDoubleOrNull() ?: 116.4074
 
@@ -62,24 +61,35 @@ class WeatherNotificationWorker(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "weather_calendar.db",
-            ).build()
+            )
+                .addMigrations(AppDatabase.MIGRATION_1_2)
+                .build()
 
             val cacheKey = WeatherEntity.key(cityLat, cityLon)
             val cached = db.weatherDao().get(cacheKey)
+
+            // 读取明天的 App 内事件
+            val tomorrow = LocalDate.now().plusDays(1)
+            val tomorrowEvents = try {
+                db.eventDao().getByDate(tomorrow.toString())
+            } catch (_: Exception) {
+                emptyList()
+            }
+
             db.close()
 
             if (cached == null) return Result.success()
 
             val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)
-            checkAndNotify(response)
+            checkAndNotify(response, tomorrowEvents.isNotEmpty())
 
             Result.success()
         } catch (_: Exception) {
-            Result.success() // 通知失败不重试
+            Result.success()
         }
     }
 
-    private fun checkAndNotify(response: OpenMeteoResponse) {
+    private fun checkAndNotify(response: OpenMeteoResponse, hasTomorrowEvents: Boolean) {
         val daily = response.daily ?: return
         val tomorrow = LocalDate.now().plusDays(1).toString()
         val index = daily.time.indexOf(tomorrow)
@@ -117,10 +127,18 @@ class WeatherNotificationWorker(
                 "明天 $min°~$max°（温差${tempDiff}°），注意穿衣",
             )
         }
+
+        // 3. 日程+天气联动提醒
+        if (hasTomorrowEvents && isRainOrSnow) {
+            sendNotification(
+                NOTIFICATION_ID_EVENT,
+                "明天有日程且天气不佳 📅",
+                "明天有安排且预计${condition.label}，建议提前出门",
+            )
+        }
     }
 
     private fun sendNotification(id: Int, title: String, text: String) {
-        // 检查通知权限（Android 13+）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     context, Manifest.permission.POST_NOTIFICATIONS
@@ -155,7 +173,7 @@ class WeatherNotificationWorker(
             "天气提醒",
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "天气变化和温差提醒"
+            description = "天气变化、温差和日程联动提醒"
         }
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
@@ -166,11 +184,11 @@ class WeatherNotificationWorker(
         private const val WORK_NAME = "weather_notification"
         private const val NOTIFICATION_ID_RAIN = 1001
         private const val NOTIFICATION_ID_TEMP = 1002
+        private const val NOTIFICATION_ID_EVENT = 1003
 
-        /** 注册定时通知任务 */
         fun enqueue(context: Context) {
             val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.NOT_REQUIRED) // 读缓存，不需要网络
+                .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
                 .build()
 
             val request = PeriodicWorkRequestBuilder<WeatherNotificationWorker>(
@@ -186,7 +204,6 @@ class WeatherNotificationWorker(
             )
         }
 
-        /** 取消定时通知任务 */
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
         }

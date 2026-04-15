@@ -79,6 +79,7 @@ fun WeatherCalendarNavHost() {
                 hourlyForecast = uiState.hourlyForecast,
                 threeDays = uiState.threeDays,
                 weatherDetails = uiState.weatherDetails,
+                rainForecast = uiState.rainForecast,
                 isLoading = uiState.isLoading,
                 error = uiState.error,
                 tempUnit = uiState.tempUnit,
@@ -105,6 +106,7 @@ fun WeatherCalendarNavHost() {
                 onNextMonth = { viewModel.changeMonth(1) },
                 onAddEvent = { date, title, time -> viewModel.addEvent(title, date, time) },
                 onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
+                onUpdateEvent = { id, date, title, time -> viewModel.updateEvent(id, title, date, time) },
             )
         }
 

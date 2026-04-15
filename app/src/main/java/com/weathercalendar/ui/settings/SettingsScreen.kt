@@ -201,6 +201,16 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(12.dp))
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Text(
+                "隐私政策",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable {
+                    uriHandler.openUri("https://github.com/louise-mars/kiro/blob/main/docs/PRIVACY_POLICY.md")
+                },
+            )
 
             Spacer(Modifier.height(32.dp))
         }

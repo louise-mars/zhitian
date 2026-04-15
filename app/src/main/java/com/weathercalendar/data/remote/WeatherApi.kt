@@ -15,6 +15,7 @@ interface WeatherApi {
         @Query("current") current: String = CURRENT_PARAMS,
         @Query("hourly") hourly: String = HOURLY_PARAMS,
         @Query("daily") daily: String = DAILY_PARAMS,
+        @Query("minutely_15") minutely15: String = MINUTELY_PARAMS,
         @Query("timezone") timezone: String = "auto",
         @Query("forecast_days") forecastDays: Int = 7,
     ): OpenMeteoResponse
@@ -27,6 +28,8 @@ interface WeatherApi {
         private const val HOURLY_PARAMS =
             "temperature_2m,weather_code"
         private const val DAILY_PARAMS =
-            "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,wind_speed_10m_max"
+            "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,wind_speed_10m_max,sunrise,sunset"
+        private const val MINUTELY_PARAMS =
+            "precipitation"
     }
 }

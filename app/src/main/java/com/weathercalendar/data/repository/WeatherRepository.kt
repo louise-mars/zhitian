@@ -5,11 +5,13 @@ import com.weathercalendar.data.local.WeatherEntity
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DailyWeather
 import com.weathercalendar.data.model.HourlyForecast
+import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.OpenMeteoResponse
 import com.weathercalendar.data.remote.WeatherApi
 import com.weathercalendar.data.remote.WeatherCodeMapper
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -22,6 +24,7 @@ data class WeatherData(
     val hourly: List<HourlyForecast>,
     val daily: List<DailyWeather>,
     val details: WeatherDetails,
+    val rainForecast: RainForecast? = null,
     val fromCache: Boolean = false,
 )
 
@@ -92,7 +95,7 @@ class WeatherRepository @Inject constructor(
         aqiLabel: String = "—",
     ): Result<WeatherData> {
         return try {
-            val response = api.getForecast(latitude, longitude)
+            val response = retryWithBackoff { api.getForecast(latitude, longitude) }
 
             val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
             dao.insert(
@@ -165,20 +168,80 @@ class WeatherRepository @Inject constructor(
             )
         }
 
+        // 日出日落
+        val sunriseStr = daily.sunrise.firstOrNull()?.let {
+            try { it.substringAfter("T").take(5) } catch (_: Exception) { "" }
+        } ?: ""
+        val sunsetStr = daily.sunset.firstOrNull()?.let {
+            try { it.substringAfter("T").take(5) } catch (_: Exception) { "" }
+        } ?: ""
+
         val details = WeatherDetails(
             humidity = current.humidity,
             windSpeed = current.windSpeed.toInt(),
             uvIndex = formatUvIndex(daily.uvIndexMax.firstOrNull() ?: 0.0),
             airQuality = aqiLabel,
+            sunrise = sunriseStr,
+            sunset = sunsetStr,
         )
+
+        // 分钟级降雨预报
+        val rainForecast = parseRainForecast(response.minutely15)
 
         return WeatherData(
             current = currentWeather,
             hourly = hourlyForecasts,
             daily = dailyForecasts,
             details = details,
+            rainForecast = rainForecast,
             fromCache = fromCache,
         )
+    }
+
+    /**
+     * 解析 15 分钟级降水数据，生成降雨预报摘要。
+     */
+    private fun parseRainForecast(minutely: com.weathercalendar.data.remote.OpenMeteoMinutely15?): RainForecast? {
+        if (minutely == null || minutely.precipitation.isEmpty()) return null
+
+        val now = LocalDateTime.now()
+        val isoFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+        // 找到当前时间之后的数据
+        val futureData = minutely.time.zip(minutely.precipitation).mapNotNull { (timeStr, precip) ->
+            val time = try { LocalDateTime.parse(timeStr, isoFormatter) } catch (_: Exception) { return@mapNotNull null }
+            if (time.isBefore(now.minusMinutes(15))) return@mapNotNull null
+            time to precip
+        }.take(8) // 未来 2 小时（8 个 15 分钟间隔）
+
+        if (futureData.isEmpty()) return null
+
+        val isCurrentlyRaining = futureData.firstOrNull()?.second?.let { it > 0.1 } ?: false
+
+        if (isCurrentlyRaining) {
+            // 当前在下雨，找什么时候停
+            val stopIndex = futureData.indexOfFirst { it.second < 0.1 }
+            val minutesToStop = if (stopIndex > 0) stopIndex * 15 else null
+            val summary = if (minutesToStop != null) {
+                "当前有雨，预计 ${minutesToStop} 分钟后停"
+            } else {
+                "持续降雨中"
+            }
+            return RainForecast(summary = summary, isRaining = true, minutesToRain = null, minutesToStop = minutesToStop)
+        } else {
+            // 当前没下雨，找什么时候开始
+            val startIndex = futureData.indexOfFirst { it.second > 0.1 }
+            if (startIndex < 0) {
+                return RainForecast(summary = "2 小时内无降雨", isRaining = false, minutesToRain = null, minutesToStop = null)
+            }
+            val minutesToRain = startIndex * 15
+            return RainForecast(
+                summary = "${minutesToRain} 分钟后可能下雨",
+                isRaining = false,
+                minutesToRain = minutesToRain,
+                minutesToStop = null,
+            )
+        }
     }
 
     private fun formatUvIndex(uv: Double): String = when {
@@ -187,5 +250,23 @@ class WeatherRepository @Inject constructor(
         uv < 8 -> "高"
         uv < 11 -> "很高"
         else -> "极高"
+    }
+
+    /** 指数退避重试：1s → 2s → 4s，最多 3 次 */
+    private suspend fun <T> retryWithBackoff(
+        maxRetries: Int = 3,
+        initialDelayMs: Long = 1000,
+        block: suspend () -> T,
+    ): T {
+        var currentDelay = initialDelayMs
+        repeat(maxRetries - 1) {
+            try {
+                return block()
+            } catch (_: Exception) {
+                delay(currentDelay)
+                currentDelay *= 2
+            }
+        }
+        return block() // 最后一次不 catch，让异常抛出
     }
 }
