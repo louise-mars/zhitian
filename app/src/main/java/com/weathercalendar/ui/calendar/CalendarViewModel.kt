@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 data class CalendarUiState(
@@ -43,6 +44,19 @@ class CalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
 
+    // 缓存已加载的月份数据，避免重复网络请求
+    private val monthCache = ConcurrentHashMap<YearMonth, MonthData>()
+
+    // 缓存坐标，避免每次切月都重新定位
+    private var cachedLat: Double? = null
+    private var cachedLon: Double? = null
+
+    private data class MonthData(
+        val days: List<CalendarDayCell>,
+        val eventsMap: Map<LocalDate, List<CalendarEvent>>,
+        val weatherMap: Map<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>,
+    )
+
     init {
         loadMonth(YearMonth.now())
     }
@@ -53,37 +67,64 @@ class CalendarViewModel @Inject constructor(
     }
 
     private fun loadMonth(month: YearMonth) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, currentMonth = month) }
-
-            val startDate = month.atDay(1)
-            val endDate = month.atEndOfMonth()
-            val today = LocalDate.now()
-
-            // 月份标签
+        // 如果缓存中有数据，立即显示
+        val cached = monthCache[month]
+        if (cached != null) {
             val monthLabel = "${month.year}年${month.monthValue}月"
+            val startDate = month.atDay(1)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    currentMonth = month,
+                    monthLabel = monthLabel,
+                    days = cached.days,
+                    firstDayOfWeek = startDate.dayOfWeek,
+                    eventsMap = cached.eventsMap,
+                    weatherMap = cached.weatherMap,
+                )
+            }
+            return
+        }
 
-            // 日历事件
+        // 第一步：立即渲染日历格子（纯计算，无网络）
+        val startDate = month.atDay(1)
+        val endDate = month.atEndOfMonth()
+        val monthLabel = "${month.year}年${month.monthValue}月"
+
+        val days = (1..endDate.dayOfMonth).map { day ->
+            val date = month.atDay(day)
+            CalendarDayCell(
+                date = date,
+                lunarText = LunarCalendar.getDisplayText(date),
+                isLunarFestival = LunarCalendar.isFestival(date) || LunarCalendar.isSolarTerm(date),
+                weatherIcon = null,
+                hasEvents = false,
+            )
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                currentMonth = month,
+                monthLabel = monthLabel,
+                days = days,
+                firstDayOfWeek = startDate.dayOfWeek,
+                eventsMap = emptyMap(),
+                weatherMap = emptyMap(),
+            )
+        }
+
+        // 第二步：异步加载天气和事件，加载完后更新 UI
+        viewModelScope.launch {
             val eventsMap = try {
                 calendarRepository.getEventsGroupedByDate(startDate, endDate)
             } catch (_: Exception) {
                 emptyMap()
             }
 
-            // 天气数据（仅预报范围内的日期）
             val weatherMap = mutableMapOf<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>()
             try {
-                val savedCity = cityRepository.selectedCity.first()
-                val lat: Double
-                val lon: Double
-                if (savedCity != null && savedCity.name.isNotEmpty()) {
-                    lat = savedCity.latitude
-                    lon = savedCity.longitude
-                } else {
-                    val loc = locationService.getCurrentLocation().getOrNull()
-                    lat = loc?.latitude ?: 0.0
-                    lon = loc?.longitude ?: 0.0
-                }
+                val (lat, lon) = getCoordinates()
                 if (lat != 0.0 || lon != 0.0) {
                     val weatherData = weatherRepository.getWeather(lat, lon).getOrNull()
                     weatherData?.daily?.forEach { daily ->
@@ -94,32 +135,50 @@ class CalendarViewModel @Inject constructor(
                 // 天气加载失败不影响日历显示
             }
 
-            // 构建日期格子
-            val firstDayOfWeek = startDate.dayOfWeek
-            val days = (1..endDate.dayOfMonth).map { day ->
-                val date = month.atDay(day)
-                val hasEvents = eventsMap.containsKey(date)
-                val weatherIcon = weatherMap[date]?.first?.icon
-
-                CalendarDayCell(
-                    date = date,
-                    lunarText = LunarCalendar.getDisplayText(date),
-                    isLunarFestival = LunarCalendar.isFestival(date) || LunarCalendar.isSolarTerm(date),
-                    weatherIcon = weatherIcon,
-                    hasEvents = hasEvents,
+            // 用天气和事件数据更新日期格子
+            val updatedDays = days.map { cell ->
+                cell.copy(
+                    weatherIcon = weatherMap[cell.date]?.first?.icon,
+                    hasEvents = eventsMap.containsKey(cell.date),
                 )
             }
 
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    monthLabel = monthLabel,
-                    days = days,
-                    firstDayOfWeek = firstDayOfWeek,
-                    eventsMap = eventsMap,
-                    weatherMap = weatherMap,
-                )
+            // 确保用户没有在加载期间切走
+            if (_uiState.value.currentMonth == month) {
+                _uiState.update {
+                    it.copy(
+                        days = updatedDays,
+                        eventsMap = eventsMap,
+                        weatherMap = weatherMap,
+                    )
+                }
             }
+
+            // 缓存结果
+            monthCache[month] = MonthData(updatedDays, eventsMap, weatherMap)
+        }
+    }
+
+    /**
+     * 获取坐标，优先使用缓存，避免每次切月都重新定位。
+     */
+    private suspend fun getCoordinates(): Pair<Double, Double> {
+        val lat = cachedLat
+        val lon = cachedLon
+        if (lat != null && lon != null) return lat to lon
+
+        val savedCity = cityRepository.selectedCity.first()
+        return if (savedCity != null && savedCity.name.isNotEmpty()) {
+            (savedCity.latitude to savedCity.longitude).also {
+                cachedLat = it.first
+                cachedLon = it.second
+            }
+        } else {
+            val loc = locationService.getCurrentLocation().getOrNull()
+            val result = (loc?.latitude ?: 0.0) to (loc?.longitude ?: 0.0)
+            cachedLat = result.first
+            cachedLon = result.second
+            result
         }
     }
 }

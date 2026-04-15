@@ -6,6 +6,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.weathercalendar.data.local.AppDatabase
 import com.weathercalendar.data.local.WeatherDao
 import com.weathercalendar.data.remote.GeocodingApi
+import com.weathercalendar.data.remote.NominatimApi
 import com.weathercalendar.data.remote.WeatherApi
 import dagger.Module
 import dagger.Provides
@@ -78,6 +79,23 @@ object AppModule {
     @Singleton
     fun provideGeocodingApi(@Named("geocoding") retrofit: Retrofit): GeocodingApi {
         return retrofit.create(GeocodingApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("nominatim")
+    fun provideNominatimRetrofit(client: OkHttpClient, json: Json): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(NominatimApi.BASE_URL)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideNominatimApi(@Named("nominatim") retrofit: Retrofit): NominatimApi {
+        return retrofit.create(NominatimApi::class.java)
     }
 
     // ── Room ──

@@ -3,16 +3,15 @@ package com.weathercalendar.data.location
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Geocoder
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import com.weathercalendar.data.remote.NominatimApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -26,6 +25,7 @@ data class LocationResult(
 @Singleton
 class LocationService @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val nominatimApi: NominatimApi,
 ) {
     private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
 
@@ -99,13 +99,19 @@ class LocationService @Inject constructor(
         }
     }
 
-    private fun reverseGeocode(lat: Double, lon: Double): String {
+    /**
+     * 使用 Nominatim (OpenStreetMap) 反向地理编码。
+     * 替代 Android Geocoder，在国内可正常使用。
+     */
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String {
         return try {
-            val geocoder = Geocoder(context, Locale.getDefault())
-            @Suppress("DEPRECATION")
-            val addresses = geocoder.getFromLocation(lat, lon, 1)
-            addresses?.firstOrNull()?.locality
-                ?: addresses?.firstOrNull()?.subAdminArea
+            val response = nominatimApi.reverseGeocode(latitude = lat, longitude = lon)
+            val address = response.address
+            // 优先取 city，其次 town、village、county
+            address?.city
+                ?: address?.town
+                ?: address?.village
+                ?: address?.county
                 ?: "未知位置"
         } catch (_: Exception) {
             "未知位置"

@@ -33,29 +33,43 @@ fun CurrentWeatherCard(
 ) {
     GlassCard(
         modifier = modifier.fillMaxWidth(),
-        alpha = 0.15f,
+        alpha = 0.18f,
         cornerRadius = 24.dp,
+        elevation = 12.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 32.dp, horizontal = 24.dp),
+                .padding(vertical = 36.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = weather.condition.icon, fontSize = 48.sp)
+            // 天气图标
+            Text(text = weather.condition.icon, fontSize = 56.sp)
+
             Spacer(Modifier.height(8.dp))
+
+            // 温度 — 大号 Light 字重 + 字间距，视觉抓眼
             Text(
                 text = weather.temperature.formatTempShort(tempUnit),
                 color = textColor,
-                style = MaterialTheme.typography.displayLarge,
+                fontSize = 72.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 2.sp,
             )
+
             Spacer(Modifier.height(4.dp))
+
+            // 天气描述
             Text(
                 text = weather.condition.label,
                 color = textColor,
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
             )
-            Spacer(Modifier.height(12.dp))
+
+            Spacer(Modifier.height(16.dp))
+
+            // 体感温度 + 建议
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     text = "体感 ${weather.feelsLike.formatTempShort(tempUnit)}",

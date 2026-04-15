@@ -38,7 +38,7 @@ fun HourlyForecastRow(
     LazyRow(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(items, key = { it.time }) { item ->
             HourlyChip(item = item, textColor = textColor, tempUnit = tempUnit)
@@ -53,27 +53,31 @@ private fun HourlyChip(
     tempUnit: TemperatureUnit,
 ) {
     GlassCard(
-        alpha = if (item.isNow) 0.25f else 0.10f,
-        cornerRadius = 16.dp,
+        alpha = if (item.isNow) 0.35f else 0.10f,
+        cornerRadius = 20.dp,
+        elevation = if (item.isNow) 8.dp else 2.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // 时间标签
             Text(
                 text = if (item.isNow) "现在" else item.time.format(timeFormatter),
-                color = textColor.copy(alpha = 0.7f),
+                color = if (item.isNow) textColor else textColor.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (item.isNow) FontWeight.Bold else FontWeight.Normal,
             )
-            Spacer(Modifier.height(6.dp))
-            Text(text = item.condition.icon, fontSize = 20.sp)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+            // 天气图标
+            Text(text = item.condition.icon, fontSize = 22.sp)
+            Spacer(Modifier.height(8.dp))
+            // 温度
             Text(
                 text = item.temperature.formatTempShort(tempUnit),
                 color = textColor,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
+                fontWeight = if (item.isNow) FontWeight.Bold else FontWeight.Medium,
             )
         }
     }

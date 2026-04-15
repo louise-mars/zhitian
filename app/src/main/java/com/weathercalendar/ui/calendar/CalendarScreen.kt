@@ -254,9 +254,8 @@ private fun DayCellView(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bgColor = when {
-        isSelected -> Color.White.copy(alpha = 0.25f)
-        isToday -> Color.White.copy(alpha = 0.15f)
+    val cellBgColor = when {
+        isSelected && !isToday -> Color.White.copy(alpha = 0.15f)
         else -> Color.Transparent
     }
 
@@ -265,22 +264,44 @@ private fun DayCellView(
         else -> Color.White.copy(alpha = 0.5f)
     }
 
+    // 今天的日期数字颜色：白底上用深色
+    val dayNumberColor = if (isToday) Color(0xFF0288D1) else Color.White
+
     Column(
         modifier = modifier
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(bgColor)
+            .background(cellBgColor)
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // 日期数字
-        Text(
-            text = "${cell.date.dayOfMonth}",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-            color = Color.White,
-        )
+        // 日期数字 — 今天用白色圆形背景强突出
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .then(
+                    if (isToday) {
+                        Modifier
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    } else if (isSelected) {
+                        Modifier
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.25f))
+                    } else {
+                        Modifier
+                    }
+                ),
+        ) {
+            Text(
+                text = "${cell.date.dayOfMonth}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = dayNumberColor,
+            )
+        }
 
         // 农历
         Text(

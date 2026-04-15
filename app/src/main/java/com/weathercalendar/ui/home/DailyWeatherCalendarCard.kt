@@ -57,7 +57,8 @@ fun DailyWeatherCalendarCard(
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         alpha = 0.12f,
-        cornerRadius = 16.dp,
+        cornerRadius = 20.dp,
+        elevation = 8.dp,
     ) {
         Column(
             modifier = Modifier
@@ -115,7 +116,7 @@ private fun DailyItemRow(
                 )
             )
             .then(if (hasEvents) Modifier.clickable(onClick = onToggle) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

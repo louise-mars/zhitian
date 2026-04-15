@@ -53,6 +53,7 @@ import com.weathercalendar.data.model.HourlyForecast
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.repository.TemperatureUnit
+import com.weathercalendar.ui.components.WeatherAnimationOverlay
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
 import com.weathercalendar.ui.theme.WeatherColors
 
@@ -101,6 +102,12 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(animatedStart, animatedEnd))),
         ) {
+            // 天气动态粒子动画层
+            WeatherAnimationOverlay(
+                condition = focusedCondition,
+                isDay = currentWeather.isDay,
+            )
+
             when {
                 isLoading && hourlyForecast.isEmpty() -> {
                     LoadingContent(textColor = textColor)
@@ -166,22 +173,22 @@ fun HomeScreen(
                             )
                         }
 
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(24.dp))
 
                         if (hourlyForecast.isNotEmpty()) {
                             SectionLabel("小时预报", textColor)
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(12.dp))
                             HourlyForecastRow(
                                 items = hourlyForecast,
                                 textColor = textColor,
                                 tempUnit = tempUnit,
                             )
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(24.dp))
                         }
 
                         if (threeDays.isNotEmpty()) {
                             SectionLabel("近三天", textColor)
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(12.dp))
                             DailyWeatherCalendarCard(
                                 days = threeDays,
                                 textColor = textColor,
@@ -190,7 +197,7 @@ fun HomeScreen(
                                 tempUnit = tempUnit,
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(24.dp))
                         }
 
                         ExpandableDetailsCard(

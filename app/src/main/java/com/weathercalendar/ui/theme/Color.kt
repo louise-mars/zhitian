@@ -5,31 +5,32 @@ import com.weathercalendar.data.model.WeatherCondition
 
 /**
  * 天气动态渐变配色 — 用于全页背景。
+ * 高饱和度渐变，提升视觉冲击力。
  */
 object WeatherColors {
 
     data class GradientPair(val start: Color, val end: Color)
 
-    // 晴天
-    private val Sunny = GradientPair(Color(0xFF4FC3F7), Color(0xFF0288D1))
-    // 多云
-    private val Cloudy = GradientPair(Color(0xFFB0BEC5), Color(0xFF78909C))
-    // 雨天
-    private val Rainy = GradientPair(Color(0xFF546E7A), Color(0xFF37474F))
-    // 雪天
-    private val Snowy = GradientPair(Color(0xFFE1F5FE), Color(0xFFB3E5FC))
-    // 夜间
+    // 晴天 — 鲜亮蓝
+    private val Sunny = GradientPair(Color(0xFF4FACFE), Color(0xFF00F2FE))
+    // 多云 — 柔灰蓝
+    private val Cloudy = GradientPair(Color(0xFF89A0B0), Color(0xFF546E7A))
+    // 雨天 — 深青
+    private val Rainy = GradientPair(Color(0xFF5F9EA0), Color(0xFF2F4F4F))
+    // 雪天 — 冰蓝白
+    private val Snowy = GradientPair(Color(0xFFE8F0FE), Color(0xFFB8D4E8))
+    // 夜间 — 深蓝紫
     private val Night = GradientPair(Color(0xFF1A237E), Color(0xFF0D47A1))
-    // 雷暴
+    // 雷暴 — 暗灰
     private val Storm = GradientPair(Color(0xFF424242), Color(0xFF212121))
-    // 雾
+    // 雾 — 柔灰
     private val Foggy = GradientPair(Color(0xFFCFD8DC), Color(0xFF90A4AE))
 
     fun gradientFor(condition: WeatherCondition, isDay: Boolean = true): GradientPair {
         if (!isDay) return Night
         return when (condition) {
             WeatherCondition.SUNNY -> Sunny
-            WeatherCondition.PARTLY_CLOUDY -> Sunny  // 偏晴
+            WeatherCondition.PARTLY_CLOUDY -> Sunny
             WeatherCondition.CLOUDY -> Cloudy
             WeatherCondition.FOGGY -> Foggy
             WeatherCondition.DRIZZLE, WeatherCondition.RAINY -> Rainy
@@ -51,8 +52,8 @@ object WeatherColors {
     fun calendarGradientFor(condition: WeatherCondition, isDay: Boolean = true): GradientPair {
         val base = gradientFor(condition, isDay)
         return GradientPair(
-            start = base.start.copy(alpha = 0.6f),
-            end = base.end.copy(alpha = 0.6f),
+            start = base.start.copy(alpha = 0.7f),
+            end = base.end.copy(alpha = 0.8f),
         )
     }
 
