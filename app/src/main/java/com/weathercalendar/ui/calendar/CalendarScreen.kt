@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,15 +32,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,17 +63,28 @@ import com.weathercalendar.ui.components.GlassCard
 import com.weathercalendar.ui.components.WeatherAnimationOverlay
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
 import com.weathercalendar.ui.theme.WeatherColors
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * 日历月视图 — iOS 级极简设计 + 天气联动动画。
+ * 日历月视图 — iOS 级极简设计。
  *
- * 核心体验：选中日期 → 天气变化 → 背景渐变平滑过渡 + 粒子动画切换。
+ * 支持：
+ * - 左右滑动切月（HorizontalPager）
+ * - 箭头按钮切月
+ * - 选中日期 → 天气联动背景渐变 + 粒子动画
+ * - 底部浮层显示详情
  */
+
+// Pager 总页数和中心页（当前月）
+private const val TOTAL_MONTHS = 120 // 前后各 5 年
+private const val CENTER_PAGE = TOTAL_MONTHS / 2
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
@@ -84,15 +99,38 @@ fun CalendarScreen(
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
 
-    // ── 天气联动：选中日期 → 天气 → 渐变色 ──
+    // ── Pager 状态 ──
+    val pagerState = rememberPagerState(
+        initialPage = CENTER_PAGE,
+        pageCount = { TOTAL_MONTHS },
+    )
+
+    // 跟踪上一次的 page，用于判断滑动方向
+    var lastSettledPage by remember { mutableStateOf(CENTER_PAGE) }
+
+    // 监听 pager 滑动完成 → 触发月份切换
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            val delta = page - lastSettledPage
+            if (delta != 0) {
+                // 逐月触发（处理快速滑动多页的情况）
+                repeat(kotlin.math.abs(delta)) {
+                    if (delta > 0) onNextMonth() else onPrevMonth()
+                }
+                lastSettledPage = page
+            }
+        }
+    }
+
+    // ── 天气联动 ──
     val selectedCondition = selectedDate?.let { date ->
         todayWeather?.get(date)?.first
     } ?: WeatherCondition.SUNNY
 
     val gradient = WeatherColors.calendarGradientFor(selectedCondition)
 
-    // 平滑过渡渐变色（500ms tween）
     val animatedStart by animateColorAsState(
         targetValue = gradient.start,
         animationSpec = tween(600),
@@ -124,7 +162,7 @@ fun CalendarScreen(
                 )
             ),
     ) {
-        // ── 天气粒子动画层 ──
+        // 天气粒子动画层
         WeatherAnimationOverlay(
             condition = selectedCondition,
             isDay = true,
@@ -139,8 +177,16 @@ fun CalendarScreen(
             CalendarTopBar(
                 monthLabel = monthLabel,
                 onBack = onBack,
-                onPrevMonth = onPrevMonth,
-                onNextMonth = onNextMonth,
+                onPrevMonth = {
+                    scope.launch {
+                        pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                    }
+                },
+                onNextMonth = {
+                    scope.launch {
+                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                    }
+                },
             )
 
             Spacer(Modifier.height(16.dp))
@@ -150,18 +196,28 @@ fun CalendarScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // ── 日历网格 ──
-            MonthGrid(
-                days = days,
-                firstDayOfWeek = firstDayOfWeek,
-                today = LocalDate.now(),
-                selectedDate = selectedDate,
-                weatherMap = todayWeather,
-                onDateClick = { date -> selectedDate = date },
-            )
+            // ── 月视图 Pager（左右滑动切月）──
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                key = { it },
+            ) { _ ->
+                // 每页都渲染当前 ViewModel 的 days 数据
+                // （ViewModel 在 pager settle 时已切换月份）
+                MonthGrid(
+                    days = days,
+                    firstDayOfWeek = firstDayOfWeek,
+                    today = LocalDate.now(),
+                    selectedDate = selectedDate,
+                    weatherMap = todayWeather,
+                    onDateClick = { date ->
+                        selectedDate = date
+                    },
+                )
+            }
         }
 
-        // ── 底部浮层：选中日期详情 ──
+        // ── 底部浮层 ──
         if (selectedDate != null) {
             ModalBottomSheet(
                 onDismissRequest = { selectedDate = null },
@@ -273,7 +329,9 @@ private fun MonthGrid(
     val rows = (totalCells + 6) / 7
 
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         for (row in 0 until rows) {
@@ -304,7 +362,7 @@ private fun MonthGrid(
 }
 
 // ─────────────────────────────────────────────
-// 日期格子 — iOS 风格 + 天气联动
+// 日期格子
 // ─────────────────────────────────────────────
 
 @Composable
@@ -398,7 +456,7 @@ private fun DayCellView(
 }
 
 // ─────────────────────────────────────────────
-// 底部浮层 — 选中日期详情
+// 底部浮层
 // ─────────────────────────────────────────────
 
 @Composable
