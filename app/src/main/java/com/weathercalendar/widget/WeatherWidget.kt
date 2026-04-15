@@ -48,22 +48,13 @@ class WeatherWidget : GlanceAppWidget() {
 
 @Composable
 private fun WidgetContent(data: WeatherWidgetData) {
-    val white = ColorProvider(
-        day = androidx.compose.ui.graphics.Color.White,
-        night = androidx.compose.ui.graphics.Color.White,
-    )
-    val whiteAlpha = ColorProvider(
-        day = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-        night = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-    )
+    val white = ColorProvider(androidx.compose.ui.graphics.Color.White)
+    val whiteAlpha = ColorProvider(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f))
 
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(
-                day = androidx.compose.ui.graphics.Color(data.gradientStart),
-                night = androidx.compose.ui.graphics.Color(0xFF141E30),
-            )
+            .background(ColorProvider(androidx.compose.ui.graphics.Color(data.gradientStart)))
             .padding(14.dp)
             .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically,

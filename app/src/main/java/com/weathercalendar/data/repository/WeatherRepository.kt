@@ -82,7 +82,6 @@ class WeatherRepository @Inject constructor(
         aqi <= 100 -> "重度"
         else -> "严重"
     }
-    }
 
     private suspend fun fetchAndCache(
         latitude: Double,
