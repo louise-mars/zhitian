@@ -48,13 +48,23 @@ object WeatherColors {
         }
     }
 
-    /** 日历页用：降低饱和度的渐变 */
+    /** 日历页用：天气联动渐变（比首页稍柔和但仍有辨识度） */
     fun calendarGradientFor(condition: WeatherCondition, isDay: Boolean = true): GradientPair {
-        val base = gradientFor(condition, isDay)
-        return GradientPair(
-            start = base.start.copy(alpha = 0.7f),
-            end = base.end.copy(alpha = 0.8f),
-        )
+        if (!isDay) return GradientPair(Color(0xFF141E30), Color(0xFF243B55))
+        return when (condition) {
+            WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY ->
+                GradientPair(Color(0xFF4FACFE), Color(0xFF00C6FB))
+            WeatherCondition.CLOUDY ->
+                GradientPair(Color(0xFFBDC3C7), Color(0xFF2C3E50))
+            WeatherCondition.FOGGY ->
+                GradientPair(Color(0xFFB8C6D0), Color(0xFF6E8898))
+            WeatherCondition.DRIZZLE, WeatherCondition.RAINY ->
+                GradientPair(Color(0xFF5F9EA0), Color(0xFF2F4F4F))
+            WeatherCondition.SNOWY ->
+                GradientPair(Color(0xFFD4E4F1), Color(0xFF8EAFC2))
+            WeatherCondition.STORMY ->
+                GradientPair(Color(0xFF3D4E5C), Color(0xFF1A252F))
+        }
     }
 
     // 农历节日红色

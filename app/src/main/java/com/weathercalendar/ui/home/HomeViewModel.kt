@@ -15,6 +15,7 @@ import com.weathercalendar.data.repository.TemperatureUnit
 import com.weathercalendar.data.repository.UserPrefsRepository
 import com.weathercalendar.data.repository.WeatherRepository
 import com.weathercalendar.util.LunarCalendar
+import com.weathercalendar.widget.WeatherWidgetDataProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +50,7 @@ class HomeViewModel @Inject constructor(
     private val cityRepository: CityRepository,
     private val userPrefsRepository: UserPrefsRepository,
     private val locationService: LocationService,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -103,6 +105,9 @@ class HomeViewModel @Inject constructor(
             }
 
             _uiState.update { it.copy(cityName = cityName) }
+
+            // 同步城市信息给 Widget
+            WeatherWidgetDataProvider.saveCityForWidget(appContext, cityName, lat, lon)
 
             // 获取天气（缓存优先）
             val weatherResult = weatherRepository.getWeather(lat, lon)
