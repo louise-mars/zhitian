@@ -1,12 +1,17 @@
 package com.weathercalendar.ui.calendar
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,19 +39,18 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,10 +65,8 @@ import com.weathercalendar.ui.components.GlassCard
 import com.weathercalendar.ui.components.WeatherAnimationOverlay
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
 import com.weathercalendar.ui.theme.WeatherColors
-import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -75,16 +75,11 @@ import java.util.Locale
  * 日历月视图 — iOS 级极简设计。
  *
  * 支持：
- * - 左右滑动切月（HorizontalPager）
+ * - 左右滑动切月（手势检测 + AnimatedContent 过渡动画）
  * - 箭头按钮切月
  * - 选中日期 → 天气联动背景渐变 + 粒子动画
  * - 底部浮层显示详情
  */
-
-// Pager 总页数和中心页（当前月）
-private const val TOTAL_MONTHS = 120 // 前后各 5 年
-private const val CENTER_PAGE = TOTAL_MONTHS / 2
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
@@ -99,30 +94,9 @@ fun CalendarScreen(
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
 
-    // ── Pager 状态 ──
-    val pagerState = rememberPagerState(
-        initialPage = CENTER_PAGE,
-        pageCount = { TOTAL_MONTHS },
-    )
-
-    // 跟踪上一次的 page，用于判断滑动方向
-    var lastSettledPage by remember { mutableStateOf(CENTER_PAGE) }
-
-    // 监听 pager 滑动完成 → 触发月份切换
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }.collect { page ->
-            val delta = page - lastSettledPage
-            if (delta != 0) {
-                // 逐月触发（处理快速滑动多页的情况）
-                repeat(kotlin.math.abs(delta)) {
-                    if (delta > 0) onNextMonth() else onPrevMonth()
-                }
-                lastSettledPage = page
-            }
-        }
-    }
+    // 滑动方向追踪（用于 AnimatedContent 动画方向）
+    var swipeDirection by remember { mutableIntStateOf(0) } // -1=左, 1=右, 0=无
 
     // ── 天气联动 ──
     val selectedCondition = selectedDate?.let { date ->
@@ -178,14 +152,14 @@ fun CalendarScreen(
                 monthLabel = monthLabel,
                 onBack = onBack,
                 onPrevMonth = {
-                    scope.launch {
-                        pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                    }
+                    swipeDirection = -1
+                    selectedDate = null
+                    onPrevMonth()
                 },
                 onNextMonth = {
-                    scope.launch {
-                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                    }
+                    swipeDirection = 1
+                    selectedDate = null
+                    onNextMonth()
                 },
             )
 
@@ -196,22 +170,38 @@ fun CalendarScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // ── 月视图 Pager（左右滑动切月）──
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
-                key = { it },
+            // ── 月视图（支持左右滑动 + 滑入/滑出动画）──
+            AnimatedContent(
+                targetState = monthLabel, // monthLabel 变化时触发动画
+                transitionSpec = {
+                    if (swipeDirection >= 0) {
+                        // 向右滑（下月）：新内容从右滑入，旧内容向左滑出
+                        slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                    } else {
+                        // 向左滑（上月）：新内容从左滑入，旧内容向右滑出
+                        slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
+                    }
+                },
+                label = "monthTransition",
             ) { _ ->
-                // 每页都渲染当前 ViewModel 的 days 数据
-                // （ViewModel 在 pager settle 时已切换月份）
                 MonthGrid(
                     days = days,
                     firstDayOfWeek = firstDayOfWeek,
                     today = LocalDate.now(),
                     selectedDate = selectedDate,
                     weatherMap = todayWeather,
-                    onDateClick = { date ->
-                        selectedDate = date
+                    onDateClick = { date -> selectedDate = date },
+                    onSwipeLeft = {
+                        // 左滑 → 下月
+                        swipeDirection = 1
+                        selectedDate = null
+                        onNextMonth()
+                    },
+                    onSwipeRight = {
+                        // 右滑 → 上月
+                        swipeDirection = -1
+                        selectedDate = null
+                        onPrevMonth()
                     },
                 )
             }
@@ -310,7 +300,7 @@ private fun WeekdayHeader() {
 }
 
 // ─────────────────────────────────────────────
-// 月视图网格
+// 月视图网格 — 支持左右滑动手势
 // ─────────────────────────────────────────────
 
 @Composable
@@ -321,6 +311,8 @@ private fun MonthGrid(
     selectedDate: LocalDate?,
     weatherMap: Map<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>?,
     onDateClick: (LocalDate) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit,
 ) {
     if (days.isEmpty()) return
 
@@ -328,10 +320,31 @@ private fun MonthGrid(
     val totalCells = startOffset + days.size
     val rows = (totalCells + 6) / 7
 
+    // 累计水平拖拽距离
+    var dragAccumulator by remember { mutableStateOf(0f) }
+    val swipeThreshold = 100f // 滑动阈值（像素）
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragAccumulator = 0f },
+                    onDragEnd = {
+                        if (dragAccumulator > swipeThreshold) {
+                            onSwipeRight() // 右滑 → 上月
+                        } else if (dragAccumulator < -swipeThreshold) {
+                            onSwipeLeft() // 左滑 → 下月
+                        }
+                        dragAccumulator = 0f
+                    },
+                    onDragCancel = { dragAccumulator = 0f },
+                    onHorizontalDrag = { _, dragAmount ->
+                        dragAccumulator += dragAmount
+                    },
+                )
+            },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         for (row in 0 until rows) {
