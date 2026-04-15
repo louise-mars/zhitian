@@ -10,6 +10,7 @@ import androidx.glance.GlanceTheme
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
@@ -28,16 +29,12 @@ import androidx.glance.unit.ColorProvider
 import com.weathercalendar.MainActivity
 
 /**
- * 天气日历桌面 Widget — Jetpack Glance 实现。
- *
- * 布局：
- * ┌──────────────────────────────┐
- * │ ☀️  20°        北京          │
- * │ 晴             4月15日 周三   │
- * │                农历 廿八      │
- * └──────────────────────────────┘
+ * 天气日历桌面 Widget — Jetpack Glance。
+ * 自适应尺寸：小组件显示精简信息，大组件显示完整信息。
  */
 class WeatherWidget : GlanceAppWidget() {
+
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = WeatherWidgetDataProvider.fetchData(context)
@@ -67,15 +64,15 @@ private fun WidgetContent(data: WeatherWidgetData) {
                 day = androidx.compose.ui.graphics.Color(data.gradientStart),
                 night = androidx.compose.ui.graphics.Color(0xFF141E30),
             )
-            .padding(16.dp)
+            .padding(14.dp)
             .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 第一行：天气图标 + 温度 + 城市/日期
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 左侧：天气图标 + 温度
             Text(
                 text = data.weatherIcon,
                 style = TextStyle(fontSize = 28.sp),
@@ -89,10 +86,7 @@ private fun WidgetContent(data: WeatherWidgetData) {
                     fontWeight = FontWeight.Bold,
                 ),
             )
-
             Spacer(GlanceModifier.width(16.dp))
-
-            // 右侧：城市 + 日期 + 农历
             Column(
                 modifier = GlanceModifier.defaultWeight(),
                 horizontalAlignment = Alignment.End,
@@ -101,50 +95,36 @@ private fun WidgetContent(data: WeatherWidgetData) {
                     text = data.cityName,
                     style = TextStyle(
                         color = white,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                     ),
                 )
                 Spacer(GlanceModifier.height(2.dp))
                 Text(
                     text = data.dateText,
-                    style = TextStyle(
-                        color = whiteAlpha,
-                        fontSize = 12.sp,
-                    ),
+                    style = TextStyle(color = whiteAlpha, fontSize = 11.sp),
                 )
                 if (data.lunarText.isNotEmpty()) {
                     Text(
                         text = data.lunarText,
-                        style = TextStyle(
-                            color = whiteAlpha,
-                            fontSize = 11.sp,
-                        ),
+                        style = TextStyle(color = whiteAlpha, fontSize = 10.sp),
                     )
                 }
             }
         }
 
-        // 天气描述 + 下一个事件
-        Spacer(GlanceModifier.height(4.dp))
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-        ) {
+        // 第二行：天气描述 + 明日摘要
+        Spacer(GlanceModifier.height(6.dp))
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
             Text(
                 text = data.weatherLabel,
-                style = TextStyle(
-                    color = whiteAlpha,
-                    fontSize = 13.sp,
-                ),
+                style = TextStyle(color = whiteAlpha, fontSize = 12.sp),
             )
-            if (data.nextEvent != null) {
+            if (data.tomorrowSummary != null) {
                 Spacer(GlanceModifier.width(12.dp))
                 Text(
-                    text = "📅 ${data.nextEvent}",
-                    style = TextStyle(
-                        color = whiteAlpha,
-                        fontSize = 12.sp,
-                    ),
+                    text = data.tomorrowSummary,
+                    style = TextStyle(color = whiteAlpha, fontSize = 11.sp),
                 )
             }
         }

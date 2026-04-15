@@ -118,16 +118,16 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
-            // 获取日历事件（3天），失败不影响主流程
-            val endDate = today.plusDays(2)
+            // 获取日历事件（7天），失败不影响主流程
+            val endDate = today.plusDays(6)
             val eventsMap = try {
                 calendarRepository.getEventsGroupedByDate(today, endDate)
             } catch (_: Exception) {
                 emptyMap()
             }
 
-            // 构建 3 天融合数据
-            val threeDays = weatherData.daily.take(3).map { daily ->
+            // 构建 7 天融合数据
+            val threeDays = weatherData.daily.take(7).map { daily ->
                 val dayEvents = eventsMap[daily.date] ?: emptyList()
                 DayInfo(
                     date = daily.date,

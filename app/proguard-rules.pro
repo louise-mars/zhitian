@@ -56,3 +56,16 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# ── Glance (Widget) ──
+-keep class androidx.glance.** { *; }
+-dontwarn androidx.glance.**
+
+# ── WorkManager ──
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.CoroutineWorker
+-dontwarn androidx.work.**
+
+# ── Nominatim API models ──
+-keep class com.weathercalendar.data.remote.NominatimResponse { *; }
+-keep class com.weathercalendar.data.remote.NominatimAddress { *; }

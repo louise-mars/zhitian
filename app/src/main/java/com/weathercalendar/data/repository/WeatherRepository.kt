@@ -6,6 +6,7 @@ import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DailyWeather
 import com.weathercalendar.data.model.HourlyForecast
 import com.weathercalendar.data.model.WeatherDetails
+import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.OpenMeteoResponse
 import com.weathercalendar.data.remote.WeatherApi
 import com.weathercalendar.data.remote.WeatherCodeMapper
@@ -36,11 +37,15 @@ data class WeatherData(
 @Singleton
 class WeatherRepository @Inject constructor(
     private val api: WeatherApi,
+    private val airQualityApi: AirQualityApi,
     private val dao: WeatherDao,
     private val json: Json,
 ) {
     suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
         val cacheKey = WeatherEntity.key(latitude, longitude)
+
+        // 获取空气质量（独立请求，失败不影响主流程）
+        val aqiLabel = fetchAqi(latitude, longitude)
 
         // 1. 读缓存
         val cached = dao.get(cacheKey)
@@ -49,15 +54,34 @@ class WeatherRepository @Inject constructor(
         if (cached != null && !cached.isExpired) {
             return try {
                 val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)
-                Result.success(mapResponse(response, fromCache = true))
+                Result.success(mapResponse(response, fromCache = true, aqiLabel = aqiLabel))
             } catch (_: Exception) {
-                // 缓存损坏，继续请求 API
-                fetchAndCache(latitude, longitude, cacheKey, staleCache = cached)
+                fetchAndCache(latitude, longitude, cacheKey, staleCache = cached, aqiLabel = aqiLabel)
             }
         }
 
         // 3. 缓存过期或无缓存 → 请求 API
-        return fetchAndCache(latitude, longitude, cacheKey, staleCache = cached)
+        return fetchAndCache(latitude, longitude, cacheKey, staleCache = cached, aqiLabel = aqiLabel)
+    }
+
+    private suspend fun fetchAqi(latitude: Double, longitude: Double): String {
+        return try {
+            val response = airQualityApi.getCurrent(latitude, longitude)
+            val aqi = response.current?.europeanAqi ?: return "—"
+            formatAqi(aqi)
+        } catch (_: Exception) {
+            "—"
+        }
+    }
+
+    private fun formatAqi(aqi: Int): String = when {
+        aqi <= 20 -> "优"
+        aqi <= 40 -> "良"
+        aqi <= 60 -> "轻度"
+        aqi <= 80 -> "中度"
+        aqi <= 100 -> "重度"
+        else -> "严重"
+    }
     }
 
     private suspend fun fetchAndCache(
@@ -65,11 +89,11 @@ class WeatherRepository @Inject constructor(
         longitude: Double,
         cacheKey: String,
         staleCache: WeatherEntity?,
+        aqiLabel: String = "—",
     ): Result<WeatherData> {
         return try {
             val response = api.getForecast(latitude, longitude)
 
-            // 4. 更新缓存
             val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
             dao.insert(
                 WeatherEntity(
@@ -79,27 +103,24 @@ class WeatherRepository @Inject constructor(
                 )
             )
 
-            // 清理超过 24 小时的旧缓存
             dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
 
-            Result.success(mapResponse(response, fromCache = false))
+            Result.success(mapResponse(response, fromCache = false, aqiLabel = aqiLabel))
         } catch (e: Exception) {
-            // 5. API 失败 + 有旧缓存 → 返回旧数据
             if (staleCache != null) {
                 try {
                     val response = json.decodeFromString<OpenMeteoResponse>(staleCache.responseJson)
-                    Result.success(mapResponse(response, fromCache = true))
+                    Result.success(mapResponse(response, fromCache = true, aqiLabel = aqiLabel))
                 } catch (_: Exception) {
                     Result.failure(e)
                 }
             } else {
-                // 6. 无缓存 → 返回错误
                 Result.failure(e)
             }
         }
     }
 
-    private fun mapResponse(response: OpenMeteoResponse, fromCache: Boolean): WeatherData {
+    private fun mapResponse(response: OpenMeteoResponse, fromCache: Boolean, aqiLabel: String = "—"): WeatherData {
         val current = response.current!!
         val hourly = response.hourly!!
         val daily = response.daily!!
@@ -148,7 +169,7 @@ class WeatherRepository @Inject constructor(
             humidity = current.humidity,
             windSpeed = current.windSpeed.toInt(),
             uvIndex = formatUvIndex(daily.uvIndexMax.firstOrNull() ?: 0.0),
-            airQuality = "—",
+            airQuality = aqiLabel,
         )
 
         return WeatherData(

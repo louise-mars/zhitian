@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.weathercalendar.data.local.AppDatabase
 import com.weathercalendar.data.local.WeatherDao
+import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.GeocodingApi
 import com.weathercalendar.data.remote.NominatimApi
 import com.weathercalendar.data.remote.WeatherApi
@@ -96,6 +97,23 @@ object AppModule {
     @Singleton
     fun provideNominatimApi(@Named("nominatim") retrofit: Retrofit): NominatimApi {
         return retrofit.create(NominatimApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("airquality")
+    fun provideAirQualityRetrofit(client: OkHttpClient, json: Json): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(AirQualityApi.BASE_URL)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAirQualityApi(@Named("airquality") retrofit: Retrofit): AirQualityApi {
+        return retrofit.create(AirQualityApi::class.java)
     }
 
     // ── Room ──

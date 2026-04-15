@@ -187,7 +187,7 @@ fun HomeScreen(
                         }
 
                         if (threeDays.isNotEmpty()) {
-                            SectionLabel("近三天", textColor)
+                            SectionLabel("7日预报", textColor)
                             Spacer(Modifier.height(12.dp))
                             DailyWeatherCalendarCard(
                                 days = threeDays,
