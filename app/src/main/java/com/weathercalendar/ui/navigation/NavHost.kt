@@ -103,6 +103,8 @@ fun WeatherCalendarNavHost() {
                 onBack = { navController.popBackStack() },
                 onPrevMonth = { viewModel.changeMonth(-1) },
                 onNextMonth = { viewModel.changeMonth(1) },
+                onAddEvent = { date, title, time -> viewModel.addEvent(title, date, time) },
+                onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
             )
         }
 

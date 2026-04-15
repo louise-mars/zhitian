@@ -91,6 +91,8 @@ fun CalendarScreen(
     onBack: () -> Unit = {},
     onPrevMonth: () -> Unit = {},
     onNextMonth: () -> Unit = {},
+    onAddEvent: (LocalDate, String, java.time.LocalTime?) -> Unit = { _, _, _ -> },
+    onDeleteEvent: (Long) -> Unit = {},
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -223,6 +225,8 @@ fun CalendarScreen(
                     weatherCondition = todayWeather?.get(selectedDate)?.first,
                     tempRange = todayWeather?.get(selectedDate)?.second,
                     events = todayEvents[selectedDate] ?: emptyList(),
+                    onAddEvent = { title, time -> onAddEvent(selectedDate!!, title, time) },
+                    onDeleteEvent = onDeleteEvent,
                 )
             }
         }
@@ -480,7 +484,12 @@ private fun DayDetailContent(
     weatherCondition: WeatherCondition?,
     tempRange: Pair<Int, Int>?,
     events: List<CalendarEvent>,
+    onAddEvent: (String, java.time.LocalTime?) -> Unit = { _, _ -> },
+    onDeleteEvent: (Long) -> Unit = {},
 ) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var newEventTitle by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -551,17 +560,34 @@ private fun DayDetailContent(
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
         Spacer(Modifier.height(12.dp))
 
-        if (events.isNotEmpty()) {
+        // 日程标题 + 添加按钮
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = "日程",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.4f),
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "+ 添加",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF4FC3F7),
+                modifier = Modifier.clickable { showAddDialog = true },
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (events.isNotEmpty()) {
             events.forEach { event ->
                 Row(
-                    modifier = Modifier.padding(vertical = 6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
@@ -584,6 +610,16 @@ private fun DayDetailContent(
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // 删除按钮（只对 App 内事件显示，id > 0 且非系统日历）
+                    Text(
+                        text = "✕",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .clickable { onDeleteEvent(event.id) }
+                            .padding(start = 8.dp),
                     )
                 }
             }
@@ -593,6 +629,48 @@ private fun DayDetailContent(
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.3f),
             )
+        }
+
+        // 添加事件内联表单
+        if (showAddDialog) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = newEventTitle,
+                    onValueChange = { newEventTitle = it },
+                    placeholder = {
+                        Text("输入事项名称", color = Color.White.copy(alpha = 0.3f))
+                    },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF4FC3F7),
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                        cursorColor = Color(0xFF4FC3F7),
+                    ),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "确定",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF4FC3F7),
+                    modifier = Modifier.clickable {
+                        if (newEventTitle.isNotBlank()) {
+                            onAddEvent(newEventTitle.trim(), null)
+                            newEventTitle = ""
+                            showAddDialog = false
+                        }
+                    },
+                )
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.repository.CalendarRepository
 import com.weathercalendar.data.repository.CityRepository
+import com.weathercalendar.data.repository.EventRepository
 import com.weathercalendar.data.repository.SavedCity
 import com.weathercalendar.data.repository.TemperatureUnit
 import com.weathercalendar.data.repository.UserPrefsRepository
@@ -50,6 +51,7 @@ class HomeViewModel @Inject constructor(
     private val cityRepository: CityRepository,
     private val userPrefsRepository: UserPrefsRepository,
     private val locationService: LocationService,
+    private val eventRepository: EventRepository,
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
 
@@ -71,20 +73,36 @@ class HomeViewModel @Inject constructor(
             val lunarText = LunarCalendar.getDisplayText(today)
             _uiState.update { it.copy(dateText = dateText, lunarText = lunarText) }
 
-            // 确定坐标：已选城市 > GPS 定位 > 默认城市（fallback）
             val savedCity = cityRepository.selectedCity.first()
             val userPrefs = userPrefsRepository.prefs.first()
+
+            // ── 快速启动：先用历史位置显示缓存数据 ──
+            val lastLat = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
+                .getString("widget_city_lat", null)?.toDoubleOrNull()
+            val lastLon = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
+                .getString("widget_city_lon", null)?.toDoubleOrNull()
+            val lastCity = appContext.getSharedPreferences("user_prefs_fallback", android.content.Context.MODE_PRIVATE)
+                .getString("widget_city_name", null)
+
+            // 如果有历史位置，先用缓存数据快速渲染
+            if (lastLat != null && lastLon != null && lastCity != null && savedCity == null) {
+                _uiState.update { it.copy(cityName = lastCity) }
+                val cachedResult = weatherRepository.getWeather(lastLat, lastLon)
+                cachedResult.getOrNull()?.let { weatherData ->
+                    showWeatherData(weatherData, today, userPrefs)
+                }
+            }
+
+            // ── 确定最新坐标 ──
             val lat: Double
             val lon: Double
             val cityName: String
 
             if (savedCity != null && savedCity.name.isNotEmpty()) {
-                // 用户手动选择的城市
                 lat = savedCity.latitude
                 lon = savedCity.longitude
                 cityName = savedCity.name
             } else if (userPrefs.useLocation) {
-                // 尝试 GPS 定位
                 val locationResult = locationService.getCurrentLocation()
                 val location = locationResult.getOrNull()
                 if (location != null) {
@@ -92,13 +110,18 @@ class HomeViewModel @Inject constructor(
                     lon = location.longitude
                     cityName = location.cityName
                 } else {
-                    // 定位失败 → fallback 到默认城市
-                    lat = userPrefs.defaultCityLat
-                    lon = userPrefs.defaultCityLon
-                    cityName = userPrefs.defaultCityName
+                    // 定位失败 → 如果有历史位置就用历史，否则用默认
+                    if (lastLat != null && lastLon != null && lastCity != null) {
+                        lat = lastLat
+                        lon = lastLon
+                        cityName = lastCity
+                    } else {
+                        lat = userPrefs.defaultCityLat
+                        lon = userPrefs.defaultCityLon
+                        cityName = userPrefs.defaultCityName
+                    }
                 }
             } else {
-                // 用户关闭了定位 → 使用默认城市
                 lat = userPrefs.defaultCityLat
                 lon = userPrefs.defaultCityLon
                 cityName = userPrefs.defaultCityName
@@ -112,44 +135,71 @@ class HomeViewModel @Inject constructor(
             // 获取天气（缓存优先）
             val weatherResult = weatherRepository.getWeather(lat, lon)
             val weatherData = weatherResult.getOrElse { e ->
+                // 如果已经有缓存数据在显示，不覆盖为错误
+                if (_uiState.value.hourlyForecast.isNotEmpty()) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(isLoading = false, error = "天气加载失败: ${e.message}")
                 }
                 return@launch
             }
 
-            // 获取日历事件（7天），失败不影响主流程
-            val endDate = today.plusDays(6)
-            val eventsMap = try {
-                calendarRepository.getEventsGroupedByDate(today, endDate)
-            } catch (_: Exception) {
-                emptyMap()
-            }
+            showWeatherData(weatherData, today, userPrefs)
+        }
+    }
 
-            // 构建 7 天融合数据
-            val threeDays = weatherData.daily.take(7).map { daily ->
-                val dayEvents = eventsMap[daily.date] ?: emptyList()
-                DayInfo(
-                    date = daily.date,
-                    weather = daily,
-                    events = dayEvents,
-                    lunarDate = LunarCalendar.getDisplayText(daily.date),
-                    lunarFestival = if (LunarCalendar.isFestival(daily.date))
-                        LunarCalendar.getDisplayText(daily.date) else null,
-                )
-            }
+    private suspend fun showWeatherData(
+        weatherData: com.weathercalendar.data.repository.WeatherData,
+        today: LocalDate,
+        userPrefs: com.weathercalendar.data.repository.UserPrefs,
+    ) {
+        // 获取日历事件（7天）
+        val endDate = today.plusDays(6)
+        val eventsMap = try {
+            calendarRepository.getEventsGroupedByDate(today, endDate)
+        } catch (_: Exception) {
+            emptyMap()
+        }
 
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    currentWeather = weatherData.current,
-                    hourlyForecast = weatherData.hourly,
-                    threeDays = threeDays,
-                    weatherDetails = weatherData.details,
-                    fromCache = weatherData.fromCache,
-                    tempUnit = userPrefs.temperatureUnit,
-                )
-            }
+        // 获取 App 内事件
+        val appEvents = try {
+            eventRepository.getEventsBetween(today, endDate)
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val appEventsMap = appEvents.groupBy { it.date }
+
+        // 合并系统日历事件和 App 内事件
+        val allDates = (eventsMap.keys + appEventsMap.keys).toSet()
+        val mergedEventsMap = allDates.associateWith { date ->
+            (eventsMap[date] ?: emptyList()) + (appEventsMap[date] ?: emptyList())
+        }
+
+        // 构建 7 天融合数据
+        val threeDays = weatherData.daily.take(7).map { daily ->
+            val dayEvents = mergedEventsMap[daily.date] ?: emptyList()
+            DayInfo(
+                date = daily.date,
+                weather = daily,
+                events = dayEvents,
+                lunarDate = LunarCalendar.getDisplayText(daily.date),
+                lunarFestival = if (LunarCalendar.isFestival(daily.date))
+                    LunarCalendar.getDisplayText(daily.date) else null,
+            )
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                currentWeather = weatherData.current,
+                hourlyForecast = weatherData.hourly,
+                threeDays = threeDays,
+                weatherDetails = weatherData.details,
+                fromCache = weatherData.fromCache,
+                tempUnit = userPrefs.temperatureUnit,
+            )
         }
     }
 

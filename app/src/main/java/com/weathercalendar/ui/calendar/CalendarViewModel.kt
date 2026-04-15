@@ -8,6 +8,7 @@ import com.weathercalendar.data.model.CalendarEvent
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.repository.CalendarRepository
 import com.weathercalendar.data.repository.CityRepository
+import com.weathercalendar.data.repository.EventRepository
 import com.weathercalendar.data.repository.WeatherRepository
 import com.weathercalendar.util.LunarCalendar
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +40,7 @@ class CalendarViewModel @Inject constructor(
     private val calendarRepository: CalendarRepository,
     private val cityRepository: CityRepository,
     private val locationService: LocationService,
+    private val eventRepository: EventRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -116,10 +118,25 @@ class CalendarViewModel @Inject constructor(
 
         // 第二步：异步加载天气和事件，加载完后更新 UI
         viewModelScope.launch {
-            val eventsMap = try {
+            // 系统日历事件
+            val systemEventsMap = try {
                 calendarRepository.getEventsGroupedByDate(startDate, endDate)
             } catch (_: Exception) {
                 emptyMap()
+            }
+
+            // App 内事件
+            val appEvents = try {
+                eventRepository.getEventsBetween(startDate, endDate)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val appEventsMap = appEvents.groupBy { it.date }
+
+            // 合并事件
+            val allDates = (systemEventsMap.keys + appEventsMap.keys).toSet()
+            val eventsMap = allDates.associateWith { date ->
+                (systemEventsMap[date] ?: emptyList()) + (appEventsMap[date] ?: emptyList())
             }
 
             val weatherMap = mutableMapOf<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>()
@@ -179,6 +196,25 @@ class CalendarViewModel @Inject constructor(
             cachedLat = result.first
             cachedLon = result.second
             result
+        }
+    }
+
+    // ── 事件 CRUD ──
+
+    fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null) {
+        viewModelScope.launch {
+            eventRepository.addEvent(title = title, date = date, time = time)
+            // 清除缓存并重新加载当前月
+            monthCache.clear()
+            loadMonth(_uiState.value.currentMonth)
+        }
+    }
+
+    fun deleteEvent(eventId: Long) {
+        viewModelScope.launch {
+            eventRepository.deleteEvent(eventId)
+            monthCache.clear()
+            loadMonth(_uiState.value.currentMonth)
         }
     }
 }

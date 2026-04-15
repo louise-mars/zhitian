@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.weathercalendar.data.local.AppDatabase
+import com.weathercalendar.data.local.EventDao
 import com.weathercalendar.data.local.WeatherDao
 import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.GeocodingApi
@@ -125,12 +126,20 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "weather_calendar.db",
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides
     @Singleton
     fun provideWeatherDao(db: AppDatabase): WeatherDao {
         return db.weatherDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideEventDao(db: AppDatabase): EventDao {
+        return db.eventDao()
     }
 }
