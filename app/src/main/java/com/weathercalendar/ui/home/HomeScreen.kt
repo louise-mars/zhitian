@@ -71,6 +71,7 @@ fun HomeScreen(
     weatherDetails: WeatherDetails,
     rainForecast: RainForecast? = null,
     warnings: List<WeatherWarning> = emptyList(),
+    todayEvents: List<com.weathercalendar.data.model.CalendarEvent> = emptyList(),
     isLoading: Boolean = false,
     error: String? = null,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
@@ -192,6 +193,16 @@ fun HomeScreen(
                             Spacer(Modifier.height(24.dp))
                         }
 
+                        // ── 一句话智能建议 ──
+                        SmartAdviceCard(
+                            currentWeather = currentWeather,
+                            todayInfo = threeDays.firstOrNull(),
+                            rainForecast = rainForecast,
+                            textColor = textColor,
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+                        Spacer(Modifier.height(12.dp))
+
                         // ── 天气预警 ──
                         if (warnings.isNotEmpty()) {
                             WeatherWarningCard(
@@ -228,6 +239,26 @@ fun HomeScreen(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
                             Spacer(Modifier.height(24.dp))
+                        }
+
+                        // ── 今日日程 ──
+                        if (todayEvents.isNotEmpty()) {
+                            TodayEventsCard(
+                                events = todayEvents,
+                                textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(16.dp))
+                        }
+
+                        // ── 明日概览 ──
+                        if (threeDays.size >= 2) {
+                            TomorrowOverviewCard(
+                                tomorrowInfo = threeDays[1],
+                                textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(16.dp))
                         }
 
                         // ── 生活指数 ──

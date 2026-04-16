@@ -48,6 +48,7 @@ data class HomeUiState(
     val weatherDetails: WeatherDetails = WeatherDetails(0, 0, "—", "—"),
     val rainForecast: RainForecast? = null,
     val warnings: List<WeatherWarning> = emptyList(),
+    val todayEvents: List<com.weathercalendar.data.model.CalendarEvent> = emptyList(),
     val fromCache: Boolean = false,
     val tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
 )
@@ -223,6 +224,7 @@ class HomeViewModel @Inject constructor(
                 weatherDetails = weatherData.details,
                 rainForecast = weatherData.rainForecast,
                 warnings = weatherData.warnings,
+                todayEvents = mergedEventsMap[today] ?: emptyList(),
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,
             )

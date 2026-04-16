@@ -82,6 +82,7 @@ fun WeatherCalendarNavHost() {
                 weatherDetails = uiState.weatherDetails,
                 rainForecast = uiState.rainForecast,
                 warnings = uiState.warnings,
+                todayEvents = uiState.todayEvents,
                 isLoading = uiState.isLoading,
                 error = uiState.error,
                 tempUnit = uiState.tempUnit,
