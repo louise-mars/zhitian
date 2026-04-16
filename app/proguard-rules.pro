@@ -69,3 +69,6 @@
 # ── Nominatim API models ──
 -keep class com.weathercalendar.data.remote.NominatimResponse { *; }
 -keep class com.weathercalendar.data.remote.NominatimAddress { *; }
+
+# ── QWeather API models ──
+-keep class com.weathercalendar.data.remote.QWeather* { *; }

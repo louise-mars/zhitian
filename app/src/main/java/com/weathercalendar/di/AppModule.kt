@@ -9,6 +9,7 @@ import com.weathercalendar.data.local.WeatherDao
 import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.GeocodingApi
 import com.weathercalendar.data.remote.NominatimApi
+import com.weathercalendar.data.remote.QWeatherApi
 import com.weathercalendar.data.remote.WeatherApi
 import dagger.Module
 import dagger.Provides
@@ -115,6 +116,23 @@ object AppModule {
     @Singleton
     fun provideAirQualityApi(@Named("airquality") retrofit: Retrofit): AirQualityApi {
         return retrofit.create(AirQualityApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("qweather")
+    fun provideQWeatherRetrofit(client: OkHttpClient, json: Json): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(QWeatherApi.BASE_URL)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideQWeatherApi(@Named("qweather") retrofit: Retrofit): QWeatherApi {
+        return retrofit.create(QWeatherApi::class.java)
     }
 
     // ── Room ──

@@ -41,9 +41,17 @@ data class WeatherData(
 class WeatherRepository @Inject constructor(
     private val api: WeatherApi,
     private val airQualityApi: AirQualityApi,
+    private val qWeatherRepository: QWeatherRepository,
     private val dao: WeatherDao,
     private val json: Json,
 ) {
+    /**
+     * 双数据源策略：
+     * 1. 先读 Room 缓存（快速显示）
+     * 2. 尝试和风天气（中国区主数据源）
+     * 3. 和风失败 → fallback 到 Open-Meteo
+     * 4. 成功后写入缓存
+     */
     suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
         val cacheKey = WeatherEntity.key(latitude, longitude)
 
@@ -94,18 +102,33 @@ class WeatherRepository @Inject constructor(
         staleCache: WeatherEntity?,
         aqiLabel: String = "—",
     ): Result<WeatherData> {
+        // 1. 尝试和风天气（中国区主数据源）
+        val qResult = try {
+            qWeatherRepository.getWeather(latitude, longitude)
+        } catch (_: Exception) {
+            Result.failure(Exception("QWeather failed"))
+        }
+
+        if (qResult.isSuccess) {
+            val data = qResult.getOrThrow()
+            // 缓存 Open-Meteo 格式的数据（保持缓存兼容性）
+            try {
+                val response = retryWithBackoff { api.getForecast(latitude, longitude) }
+                val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
+                dao.insert(WeatherEntity(cacheKey = cacheKey, responseJson = responseJson, updatedAt = System.currentTimeMillis()))
+                dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
+            } catch (_: Exception) {
+                // 缓存写入失败不影响返回
+            }
+            return Result.success(data)
+        }
+
+        // 2. 和风失败 → fallback 到 Open-Meteo
         return try {
             val response = retryWithBackoff { api.getForecast(latitude, longitude) }
 
             val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
-            dao.insert(
-                WeatherEntity(
-                    cacheKey = cacheKey,
-                    responseJson = responseJson,
-                    updatedAt = System.currentTimeMillis(),
-                )
-            )
-
+            dao.insert(WeatherEntity(cacheKey = cacheKey, responseJson = responseJson, updatedAt = System.currentTimeMillis()))
             dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
 
             Result.success(mapResponse(response, fromCache = false, aqiLabel = aqiLabel))
