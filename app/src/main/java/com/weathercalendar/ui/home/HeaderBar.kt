@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ fun HeaderBar(
     onCityClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onShareClick: () -> Unit = {},
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -77,8 +79,16 @@ fun HeaderBar(
             }
         }
 
-        // 右侧：日历 + 设置
+        // 右侧：分享 + 日历 + 设置
         Row {
+            IconButton(onClick = onShareClick) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = "分享",
+                    tint = textColor,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             IconButton(onClick = onCalendarClick) {
                 Icon(
                     Icons.Default.CalendarMonth,

@@ -10,6 +10,7 @@ import com.weathercalendar.data.model.HourlyForecast
 import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
+import com.weathercalendar.data.model.WeatherWarning
 import com.weathercalendar.data.repository.CalendarRepository
 import com.weathercalendar.data.repository.CityRepository
 import com.weathercalendar.data.repository.EventRepository
@@ -46,6 +47,7 @@ data class HomeUiState(
     val threeDays: List<DayInfo> = emptyList(),
     val weatherDetails: WeatherDetails = WeatherDetails(0, 0, "—", "—"),
     val rainForecast: RainForecast? = null,
+    val warnings: List<WeatherWarning> = emptyList(),
     val fromCache: Boolean = false,
     val tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
 )
@@ -220,6 +222,7 @@ class HomeViewModel @Inject constructor(
                 threeDays = days,
                 weatherDetails = weatherData.details,
                 rainForecast = weatherData.rainForecast,
+                warnings = weatherData.warnings,
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,
             )

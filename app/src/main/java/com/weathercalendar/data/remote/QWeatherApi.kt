@@ -51,9 +51,16 @@ interface QWeatherApi {
     @GET("v7/indices/1d")
     suspend fun indices(
         @Query("location") location: String,
-        @Query("type") type: String = "0", // 0=全部
+        @Query("type") type: String = "0",
         @Query("key") key: String = API_KEY,
     ): QWeatherIndicesResponse
+
+    /** 天气灾害预警 */
+    @GET("v7/warning/now")
+    suspend fun warningNow(
+        @Query("location") location: String,
+        @Query("key") key: String = API_KEY,
+    ): QWeatherWarningResponse
 
     companion object {
         const val BASE_URL = "https://devapi.qweather.com/"
@@ -157,4 +164,23 @@ data class QWeatherIndex(
     val name: String,           // "运动指数"
     val category: String,       // "适宜"/"较适宜" 等
     val text: String,           // 详细描述
+)
+
+@Serializable
+data class QWeatherWarningResponse(
+    val code: String,
+    val warning: List<QWeatherWarning> = emptyList(),
+)
+
+@Serializable
+data class QWeatherWarning(
+    val id: String = "",
+    val sender: String = "",        // 发布单位
+    val pubTime: String = "",       // 发布时间
+    val title: String = "",         // "北京市气象台发布暴雨蓝色预警"
+    val text: String = "",          // 详细内容
+    val typeName: String = "",      // "暴雨"
+    val level: String = "",         // "蓝色"
+    val severity: String = "",      // Minor/Moderate/Severe/Extreme
+    val severityColor: String = "", // 预警颜色
 )

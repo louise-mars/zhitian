@@ -53,6 +53,7 @@ import com.weathercalendar.data.model.HourlyForecast
 import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.data.model.WeatherDetails
+import com.weathercalendar.data.model.WeatherWarning
 import com.weathercalendar.data.repository.TemperatureUnit
 import com.weathercalendar.ui.components.WeatherAnimationOverlay
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
@@ -69,12 +70,14 @@ fun HomeScreen(
     threeDays: List<DayInfo>,
     weatherDetails: WeatherDetails,
     rainForecast: RainForecast? = null,
+    warnings: List<WeatherWarning> = emptyList(),
     isLoading: Boolean = false,
     error: String? = null,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
     onCityClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onShareClick: () -> Unit = {},
     onRefresh: () -> Unit = {},
 ) {
     // 当前聚焦的天（用于 pager 和渐变色）
@@ -134,6 +137,7 @@ fun HomeScreen(
                             onCityClick = onCityClick,
                             onCalendarClick = onCalendarClick,
                             onSettingsClick = onSettingsClick,
+                            onShareClick = onShareClick,
                             modifier = Modifier.padding(horizontal = 20.dp),
                         )
 
@@ -186,6 +190,15 @@ fun HomeScreen(
                                 tempUnit = tempUnit,
                             )
                             Spacer(Modifier.height(24.dp))
+                        }
+
+                        // ── 天气预警 ──
+                        if (warnings.isNotEmpty()) {
+                            WeatherWarningCard(
+                                warnings = warnings,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(12.dp))
                         }
 
                         // ── 分钟级降雨预报 ──

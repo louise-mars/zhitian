@@ -112,6 +112,24 @@ class QWeatherRepository @Inject constructor(
                 sunset = sunset,
             )
 
+            // 天气预警（独立请求）
+            val warnings = try {
+                val warnResp = api.warningNow(location)
+                if (warnResp.code == "200") {
+                    warnResp.warning.map { w ->
+                        com.weathercalendar.data.model.WeatherWarning(
+                            title = w.title,
+                            text = w.text,
+                            typeName = w.typeName,
+                            level = w.level,
+                            severityColor = w.severityColor,
+                        )
+                    }
+                } else emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+
             Result.success(
                 WeatherData(
                     current = currentWeather,
@@ -119,6 +137,7 @@ class QWeatherRepository @Inject constructor(
                     daily = dailyForecasts,
                     details = details,
                     rainForecast = rainForecast,
+                    warnings = warnings,
                     fromCache = false,
                 )
             )

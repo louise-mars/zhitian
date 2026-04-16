@@ -21,6 +21,7 @@ import com.weathercalendar.ui.city.CityPickerSheet
 import com.weathercalendar.ui.city.CityViewModel
 import com.weathercalendar.ui.home.HomeScreen
 import com.weathercalendar.ui.home.HomeViewModel
+import com.weathercalendar.ui.home.shareWeatherText
 import com.weathercalendar.ui.permission.PermissionScreen
 import com.weathercalendar.ui.settings.SettingsScreen
 
@@ -80,12 +81,22 @@ fun WeatherCalendarNavHost() {
                 threeDays = uiState.threeDays,
                 weatherDetails = uiState.weatherDetails,
                 rainForecast = uiState.rainForecast,
+                warnings = uiState.warnings,
                 isLoading = uiState.isLoading,
                 error = uiState.error,
                 tempUnit = uiState.tempUnit,
                 onCityClick = { showCityPicker = true },
                 onCalendarClick = { navController.navigate(Routes.CALENDAR) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+                onShareClick = {
+                    shareWeatherText(
+                        context = context,
+                        cityName = uiState.cityName,
+                        dateText = uiState.dateText,
+                        currentWeather = uiState.currentWeather,
+                        lunarText = uiState.lunarText,
+                    )
+                },
                 onRefresh = { homeViewModel.loadData() },
             )
         }

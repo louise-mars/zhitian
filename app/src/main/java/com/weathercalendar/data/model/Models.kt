@@ -59,10 +59,19 @@ data class WeatherDetails(
 
 /** 分钟级降雨预报 */
 data class RainForecast(
-    val summary: String,          // "32 分钟后开始下雨"
-    val isRaining: Boolean,       // 当前是否在下雨
-    val minutesToRain: Int?,      // 几分钟后下雨（null = 2 小时内无雨）
-    val minutesToStop: Int?,      // 几分钟后停雨（null = 不会停）
+    val summary: String,
+    val isRaining: Boolean,
+    val minutesToRain: Int?,
+    val minutesToStop: Int?,
+)
+
+/** 天气预警 */
+data class WeatherWarning(
+    val title: String,
+    val text: String,
+    val typeName: String,
+    val level: String,
+    val severityColor: String,
 )
 
 // ─────────────────────────────────────────────

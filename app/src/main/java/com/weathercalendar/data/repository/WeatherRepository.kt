@@ -7,6 +7,7 @@ import com.weathercalendar.data.model.DailyWeather
 import com.weathercalendar.data.model.HourlyForecast
 import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherDetails
+import com.weathercalendar.data.model.WeatherWarning
 import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.OpenMeteoResponse
 import com.weathercalendar.data.remote.WeatherApi
@@ -25,6 +26,7 @@ data class WeatherData(
     val daily: List<DailyWeather>,
     val details: WeatherDetails,
     val rainForecast: RainForecast? = null,
+    val warnings: List<WeatherWarning> = emptyList(),
     val fromCache: Boolean = false,
 )
 
