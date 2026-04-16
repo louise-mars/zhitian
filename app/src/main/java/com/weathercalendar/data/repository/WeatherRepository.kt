@@ -55,26 +55,24 @@ class WeatherRepository @Inject constructor(
     suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
         val cacheKey = WeatherEntity.key(latitude, longitude)
 
-        // 获取空气质量（独立请求，失败不影响主流程）
-        val aqiLabel = fetchAqi(latitude, longitude)
-
-        // 1. 读缓存
+        // 1. 读缓存（纯本地，不触发任何网络请求）
         val cached = dao.get(cacheKey)
 
-        // 2. 缓存未过期 → 直接返回
+        // 2. 缓存未过期 → 直接返回（零网络）
         if (cached != null && !cached.isExpired) {
             return try {
                 val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)
-                Result.success(mapResponse(response, fromCache = true, aqiLabel = aqiLabel))
+                Result.success(mapResponse(response, fromCache = true, aqiLabel = "—"))
             } catch (_: Exception) {
-                fetchAndCache(latitude, longitude, cacheKey, staleCache = cached, aqiLabel = aqiLabel)
+                fetchAndCache(latitude, longitude, cacheKey, staleCache = cached)
             }
         }
 
-        // 3. 缓存过期或无缓存 → 请求 API
-        return fetchAndCache(latitude, longitude, cacheKey, staleCache = cached, aqiLabel = aqiLabel)
+        // 3. 缓存过期或无缓存 → 请求 API（此时才做网络请求）
+        return fetchAndCache(latitude, longitude, cacheKey, staleCache = cached)
     }
 
+    /** 仅在需要网络刷新时才请求 AQI */
     private suspend fun fetchAqi(latitude: Double, longitude: Double): String {
         return try {
             val response = airQualityApi.getCurrent(latitude, longitude)
@@ -100,8 +98,10 @@ class WeatherRepository @Inject constructor(
         longitude: Double,
         cacheKey: String,
         staleCache: WeatherEntity?,
-        aqiLabel: String = "—",
     ): Result<WeatherData> {
+        // AQI 只在网络刷新时请求
+        val aqiLabel = fetchAqi(latitude, longitude)
+
         // 1. 尝试和风天气（中国区主数据源）
         val qResult = try {
             qWeatherRepository.getWeather(latitude, longitude)

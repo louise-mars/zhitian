@@ -45,7 +45,7 @@ fun shareWeatherText(
         appendLine()
         append(currentWeather.condition.tip)
         appendLine()
-        append("— 天气日历")
+        append("— 知天")
     }
 
     val intent = Intent(Intent.ACTION_SEND).apply {

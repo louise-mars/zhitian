@@ -5,37 +5,30 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Sun circle (top-right) -->
+    <!-- 太阳（右上角，半露出云层） -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M66,36m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+        android:fillColor="#FFD54F"
+        android:pathData="M72,32m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
 
-    <!-- Sun rays -->
+    <!-- 太阳光芒 -->
     <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2"
+        android:strokeColor="#FFD54F"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
-        android:pathData="M66,20V16 M66,56V52 M50,36H46 M86,36H82 M54.7,24.7L51.9,21.9 M77.3,47.3L80.1,50.1 M54.7,47.3L51.9,50.1 M77.3,24.7L80.1,21.9" />
+        android:pathData="M72,18V22 M72,42V46 M58,32H62 M82,32H86 M62.6,22.6L65.4,25.4 M78.6,38.6L81.4,41.4" />
 
-    <!-- Calendar body -->
+    <!-- 主云朵（白色，覆盖太阳下半部分） -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.9"
-        android:pathData="M28,52 L28,82 Q28,86 32,86 L62,86 Q66,86 66,82 L66,52 Z" />
+        android:pathData="M30,56 C30,48 36,42 44,42 C46,36 52,32 60,32 C68,32 74,37 75,44 C80,44 84,48 84,54 C84,60 80,64 74,64 L36,64 C32,64 30,60 30,56 Z" />
 
-    <!-- Calendar header bar -->
+    <!-- "知" 字简化笔画（云朵下方，白色） -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M28,48 Q28,44 32,44 L62,44 Q66,44 66,48 L66,54 L28,54 Z" />
-
-    <!-- Calendar binding dots -->
+        android:fillAlpha="0.95"
+        android:pathData="M36,72 L36,88 M36,80 L52,80 M52,72 L52,88" />
     <path
-        android:fillColor="#4FC3F7"
-        android:pathData="M38,42 A2,2 0,1 1,42,42 A2,2 0,1 1,38,42 Z M52,42 A2,2 0,1 1,56,42 A2,2 0,1 1,52,42 Z" />
-
-    <!-- Calendar grid lines -->
-    <path
-        android:strokeColor="#4FC3F7"
-        android:strokeWidth="1.5"
-        android:pathData="M34,62 H60 M34,70 H60 M34,78 H54 M42,56 V82 M52,56 V82" />
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M58,72 L58,88 M58,76 L72,76 M58,80 L72,80 M58,84 L72,84 M72,72 L72,88" />
 </vector>

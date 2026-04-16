@@ -64,108 +64,116 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val prefs get() =
+    private val sp get() =
         appContext.getSharedPreferences("user_prefs_fallback", Context.MODE_PRIVATE)
 
     init {
         loadData()
     }
 
-    /**
-     * 两阶段加载：
-     * 1. 瞬间：用历史坐标 + Room 缓存立即渲染（isLoading = false）
-     * 2. 后台：GPS 定位 + API 刷新，完成后静默更新 UI
-     */
     fun loadData() {
+        // 立即更新日期（纯计算，零延迟）
         val today = LocalDate.now()
         val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINESE)
         val dateText = today.format(DateTimeFormatter.ofPattern("M月d日")) + " $dayOfWeek"
         val lunarText = LunarCalendar.getDisplayText(today)
         _uiState.update { it.copy(dateText = dateText, lunarText = lunarText, error = null) }
 
-        // ── 阶段一：瞬间渲染缓存数据 ──
+        // ── 阶段一：瞬间渲染（独立协程，不等任何网络） ──
         viewModelScope.launch {
-            val userPrefs = userPrefsRepository.prefs.first()
-            val savedCity = cityRepository.selectedCity.first()
-
-            // 确定快速坐标（不等 GPS）
-            val quickLat: Double?
-            val quickLon: Double?
-            val quickCity: String?
-
-            if (savedCity != null && savedCity.name.isNotEmpty()) {
-                quickLat = savedCity.latitude
-                quickLon = savedCity.longitude
-                quickCity = savedCity.name
-            } else {
-                quickLat = prefs.getString("widget_city_lat", null)?.toDoubleOrNull()
-                quickLon = prefs.getString("widget_city_lon", null)?.toDoubleOrNull()
-                quickCity = prefs.getString("widget_city_name", null)
-            }
-
-            if (quickLat != null && quickLon != null && quickCity != null) {
-                _uiState.update { it.copy(cityName = quickCity) }
-                val cachedResult = weatherRepository.getWeather(quickLat, quickLon)
-                cachedResult.getOrNull()?.let { weatherData ->
-                    renderWeatherData(weatherData, today, userPrefs)
-                    // 阶段一完成，UI 已经有内容了
-                }
-            }
-
-            // ── 阶段二：后台静默刷新 ──
-            val freshLat: Double
-            val freshLon: Double
-            val freshCity: String
-
-            if (savedCity != null && savedCity.name.isNotEmpty()) {
-                // 已选城市，不需要 GPS
-                freshLat = savedCity.latitude
-                freshLon = savedCity.longitude
-                freshCity = savedCity.name
-            } else if (userPrefs.useLocation) {
-                // 后台 GPS 定位
-                val locationResult = locationService.getCurrentLocation()
-                val location = locationResult.getOrNull()
-                if (location != null) {
-                    freshLat = location.latitude
-                    freshLon = location.longitude
-                    freshCity = location.cityName
-                } else if (quickLat != null && quickLon != null && quickCity != null) {
-                    // GPS 失败，继续用历史位置
-                    freshLat = quickLat
-                    freshLon = quickLon
-                    freshCity = quickCity
-                } else {
-                    freshLat = userPrefs.defaultCityLat
-                    freshLon = userPrefs.defaultCityLon
-                    freshCity = userPrefs.defaultCityName
-                }
-            } else {
-                freshLat = userPrefs.defaultCityLat
-                freshLon = userPrefs.defaultCityLon
-                freshCity = userPrefs.defaultCityName
-            }
-
-            // 保存最新位置
-            WeatherWidgetDataProvider.saveCityForWidget(appContext, freshCity, freshLat, freshLon)
-            _uiState.update { it.copy(cityName = freshCity) }
-
-            // 获取最新天气
-            val weatherResult = weatherRepository.getWeather(freshLat, freshLon)
-            val weatherData = weatherResult.getOrElse { e ->
-                // 如果阶段一已经有数据，静默失败
-                if (_uiState.value.hourlyForecast.isNotEmpty()) {
-                    _uiState.update { it.copy(isLoading = false) }
-                    return@launch
-                }
-                _uiState.update {
-                    it.copy(isLoading = false, error = "天气加载失败: ${e.message}")
-                }
-                return@launch
-            }
-
-            renderWeatherData(weatherData, today, userPrefs)
+            loadCachedData(today)
         }
+
+        // ── 阶段二：后台静默刷新（独立协程，和阶段一并行） ──
+        viewModelScope.launch {
+            refreshFreshData(today)
+        }
+    }
+
+    /**
+     * 阶段一：纯本地操作，零网络。
+     * SharedPreferences 读坐标 → Room 读缓存 → 立即渲染。
+     */
+    private suspend fun loadCachedData(today: LocalDate) {
+        val userPrefs = userPrefsRepository.prefs.first()
+        val savedCity = cityRepository.selectedCity.first()
+
+        val lat: Double
+        val lon: Double
+        val city: String
+
+        if (savedCity != null && savedCity.name.isNotEmpty()) {
+            lat = savedCity.latitude
+            lon = savedCity.longitude
+            city = savedCity.name
+        } else {
+            lat = sp.getString("widget_city_lat", null)?.toDoubleOrNull() ?: return
+            lon = sp.getString("widget_city_lon", null)?.toDoubleOrNull() ?: return
+            city = sp.getString("widget_city_name", null) ?: return
+        }
+
+        _uiState.update { it.copy(cityName = city) }
+
+        // getWeather 在缓存未过期时只读 Room，零网络
+        val result = weatherRepository.getWeather(lat, lon)
+        result.getOrNull()?.let { data ->
+            renderWeatherData(data, today, userPrefs)
+        }
+    }
+
+    /**
+     * 阶段二：网络刷新。GPS + API，完成后静默更新 UI。
+     * 和阶段一并行执行，不阻塞 UI。
+     */
+    private suspend fun refreshFreshData(today: LocalDate) {
+        val userPrefs = userPrefsRepository.prefs.first()
+        val savedCity = cityRepository.selectedCity.first()
+
+        val lat: Double
+        val lon: Double
+        val city: String
+
+        if (savedCity != null && savedCity.name.isNotEmpty()) {
+            lat = savedCity.latitude
+            lon = savedCity.longitude
+            city = savedCity.name
+        } else if (userPrefs.useLocation) {
+            // GPS 定位（可能耗时几秒，但不阻塞 UI）
+            val locResult = locationService.getCurrentLocation()
+            val loc = locResult.getOrNull()
+            if (loc != null) {
+                lat = loc.latitude
+                lon = loc.longitude
+                city = loc.cityName
+            } else {
+                // GPS 失败，用历史位置或默认
+                lat = sp.getString("widget_city_lat", null)?.toDoubleOrNull() ?: userPrefs.defaultCityLat
+                lon = sp.getString("widget_city_lon", null)?.toDoubleOrNull() ?: userPrefs.defaultCityLon
+                city = sp.getString("widget_city_name", null) ?: userPrefs.defaultCityName
+            }
+        } else {
+            lat = userPrefs.defaultCityLat
+            lon = userPrefs.defaultCityLon
+            city = userPrefs.defaultCityName
+        }
+
+        // 保存位置
+        WeatherWidgetDataProvider.saveCityForWidget(appContext, city, lat, lon)
+        _uiState.update { it.copy(cityName = city) }
+
+        // 强制刷新天气（即使缓存未过期，阶段二也会触发网络请求）
+        val result = weatherRepository.getWeather(lat, lon)
+        val data = result.getOrElse { e ->
+            // 阶段一已经有数据了，静默失败
+            if (_uiState.value.hourlyForecast.isNotEmpty()) {
+                _uiState.update { it.copy(isLoading = false) }
+                return
+            }
+            _uiState.update { it.copy(isLoading = false, error = "天气加载失败: ${e.message}") }
+            return
+        }
+
+        renderWeatherData(data, today, userPrefs)
     }
 
     private suspend fun renderWeatherData(
@@ -175,21 +183,18 @@ class HomeViewModel @Inject constructor(
     ) {
         val endDate = today.plusDays(6)
 
-        // 系统日历事件
         val eventsMap = try {
             calendarRepository.getEventsGroupedByDate(today, endDate)
         } catch (_: Exception) {
             emptyMap()
         }
 
-        // App 内事件
         val appEventsMap = try {
             eventRepository.getEventsBetween(today, endDate).groupBy { it.date }
         } catch (_: Exception) {
             emptyMap()
         }
 
-        // 合并事件
         val allDates = (eventsMap.keys + appEventsMap.keys).toSet()
         val mergedEventsMap = allDates.associateWith { date ->
             (eventsMap[date] ?: emptyList()) + (appEventsMap[date] ?: emptyList())
