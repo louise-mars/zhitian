@@ -30,6 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -161,10 +164,15 @@ fun SettingsScreen(
             // ── 默认城市 ──
             SectionTitle("默认城市")
             Spacer(Modifier.height(8.dp))
+
+            var showCitySearch by remember { mutableStateOf(false) }
+            var cityQuery by remember { mutableStateOf("") }
+            val searchResults by viewModel.citySearchResults.collectAsStateWithLifecycle()
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { /* TODO: 打开城市搜索 */ }
+                    .clickable { showCitySearch = !showCitySearch }
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -185,13 +193,50 @@ fun SettingsScreen(
                 )
             }
 
+            // 城市搜索（展开）
+            if (showCitySearch) {
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = cityQuery,
+                    onValueChange = {
+                        cityQuery = it
+                        viewModel.searchCity(it)
+                    },
+                    placeholder = { Text("搜索城市名称") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                searchResults.forEach { result ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.setDefaultCity(result.name, result.latitude, result.longitude)
+                                cityQuery = ""
+                                showCitySearch = false
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = buildString {
+                                append(result.name)
+                                result.admin1?.let { append("，$it") }
+                                result.country?.let { append("，$it") }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             // ── 关于 ──
             SectionTitle("关于")
             Spacer(Modifier.height(8.dp))
             Text(
-                "天气日历 v1.0.0",
+                "知天 v1.0.0",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -121,6 +121,7 @@ data class CalendarDayCell(
     val date: LocalDate,
     val lunarText: String,
     val isLunarFestival: Boolean = false,
+    val holidayName: String? = null,  // 多国节日名称
     val weatherIcon: String? = null,
     val hasEvents: Boolean = false,
 )

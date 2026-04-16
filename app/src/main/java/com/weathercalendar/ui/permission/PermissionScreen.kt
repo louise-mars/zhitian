@@ -118,7 +118,7 @@ fun PermissionScreen(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "天气日历",
+                text = "知天",
                 color = Color.White,
                 style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp),
                 fontWeight = FontWeight.SemiBold,

@@ -112,17 +112,27 @@ class WeatherRepository @Inject constructor(
         }
 
         if (qResult.isSuccess) {
-            val data = qResult.getOrThrow()
-            // 缓存 Open-Meteo 格式的数据（保持缓存兼容性）
+            val qData = qResult.getOrThrow()
+
+            // 和风免费版只返回 3 天，用 Open-Meteo 补充 4-7 天
+            var mergedData = qData
             try {
-                val response = retryWithBackoff { api.getForecast(latitude, longitude) }
-                val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
+                val omResponse = retryWithBackoff { api.getForecast(latitude, longitude) }
+                val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), omResponse)
                 dao.insert(WeatherEntity(cacheKey = cacheKey, responseJson = responseJson, updatedAt = System.currentTimeMillis()))
                 dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
+
+                // 合并：和风的前 N 天 + Open-Meteo 补充剩余天数
+                val omData = mapResponse(omResponse, fromCache = false, aqiLabel = aqiLabel)
+                val qDates = qData.daily.map { it.date }.toSet()
+                val extraDays = omData.daily.filter { it.date !in qDates }
+                if (extraDays.isNotEmpty()) {
+                    mergedData = qData.copy(daily = qData.daily + extraDays)
+                }
             } catch (_: Exception) {
-                // 缓存写入失败不影响返回
+                // Open-Meteo 失败不影响，用和风的数据
             }
-            return Result.success(data)
+            return Result.success(mergedData)
         }
 
         // 2. 和风失败 → fallback 到 Open-Meteo

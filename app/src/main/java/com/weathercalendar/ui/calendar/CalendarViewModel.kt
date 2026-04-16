@@ -10,6 +10,7 @@ import com.weathercalendar.data.repository.CalendarRepository
 import com.weathercalendar.data.repository.CityRepository
 import com.weathercalendar.data.repository.EventRepository
 import com.weathercalendar.data.repository.WeatherRepository
+import com.weathercalendar.util.Holidays
 import com.weathercalendar.util.LunarCalendar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +100,7 @@ class CalendarViewModel @Inject constructor(
                 date = date,
                 lunarText = LunarCalendar.getDisplayText(date),
                 isLunarFestival = LunarCalendar.isFestival(date) || LunarCalendar.isSolarTerm(date),
+                holidayName = Holidays.getFirstHolidayName(date),
                 weatherIcon = null,
                 hasEvents = false,
             )

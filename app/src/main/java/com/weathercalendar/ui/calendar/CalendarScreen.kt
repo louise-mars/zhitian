@@ -43,7 +43,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,17 +58,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.weathercalendar.data.mock.MockData
 import com.weathercalendar.data.model.CalendarDayCell
 import com.weathercalendar.data.model.CalendarEvent
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.ui.components.GlassCard
 import com.weathercalendar.ui.components.WeatherAnimationOverlay
-import com.weathercalendar.ui.theme.WeatherCalendarTheme
 import com.weathercalendar.ui.theme.WeatherColors
+import com.weathercalendar.util.Holidays
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -95,12 +92,11 @@ fun CalendarScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var swipeDirection by remember { mutableIntStateOf(0) }
 
-    // 天气联动
     val selectedCondition = selectedDate?.let { todayWeather?.get(it)?.first } ?: WeatherCondition.SUNNY
     val gradient = WeatherColors.calendarGradientFor(selectedCondition)
-    val animatedStart by animateColorAsState(gradient.start, tween(600), label = "s")
-    val animatedEnd by animateColorAsState(gradient.end, tween(600), label = "e")
-    val animatedBottom by animateColorAsState(
+    val animStart by animateColorAsState(gradient.start, tween(600), label = "s")
+    val animEnd by animateColorAsState(gradient.end, tween(600), label = "e")
+    val animBottom by animateColorAsState(
         when (selectedCondition) {
             WeatherCondition.RAINY, WeatherCondition.DRIZZLE, WeatherCondition.STORMY -> Color(0xFF1A2332)
             WeatherCondition.SNOWY -> Color(0xFF2A3545)
@@ -112,21 +108,25 @@ fun CalendarScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(animatedStart, animatedEnd, animatedBottom))),
+            .background(Brush.verticalGradient(listOf(animStart, animEnd, animBottom))),
     ) {
         WeatherAnimationOverlay(condition = selectedCondition, isDay = true)
 
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            CalendarTopBar(monthLabel, onBack, {
-                swipeDirection = -1; selectedDate = null; onPrevMonth()
-            }, {
-                swipeDirection = 1; selectedDate = null; onNextMonth()
-            })
+            // 顶部导航
+            CalendarTopBar(monthLabel, onBack,
+                { swipeDirection = -1; selectedDate = null; onPrevMonth() },
+                { swipeDirection = 1; selectedDate = null; onNextMonth() },
+            )
 
-            Spacer(Modifier.height(12.dp))
-            WeekdayHeader()
             Spacer(Modifier.height(8.dp))
 
+            // 星期标题（万年历风格：周末红色）
+            WeekdayHeader()
+
+            Spacer(Modifier.height(6.dp))
+
+            // 月视图网格
             AnimatedContent(
                 targetState = monthLabel,
                 transitionSpec = {
@@ -141,9 +141,35 @@ fun CalendarScreen(
                     onSwipeRight = { swipeDirection = -1; selectedDate = null; onPrevMonth() },
                 )
             }
+
+            // 选中日期的简要信息（万年历风格：网格下方固定显示）
+            Spacer(Modifier.height(12.dp))
+            SelectedDateSummary(
+                selectedDate = selectedDate ?: LocalDate.now(),
+                days = days,
+                todayWeather = todayWeather,
+                todayEvents = todayEvents,
+            )
         }
 
-        // 底部浮层 — 使用实时的 todayEvents 数据
+        // 右下角浮动添加按钮
+        Box(
+            modifier = Modifier.fillMaxSize().padding(20.dp).statusBarsPadding(),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4FC3F7))
+                    .clickable { selectedDate = selectedDate ?: LocalDate.now() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // 底部浮层
         if (selectedDate != null) {
             val currentEvents = todayEvents[selectedDate] ?: emptyList()
             ModalBottomSheet(
@@ -157,16 +183,13 @@ fun CalendarScreen(
                     date = selectedDate!!,
                     lunarText = days.find { it.date == selectedDate }?.lunarText ?: "",
                     isLunarFestival = days.find { it.date == selectedDate }?.isLunarFestival == true,
+                    holidays = Holidays.getHolidays(selectedDate!!),
                     weatherCondition = todayWeather?.get(selectedDate)?.first,
                     tempRange = todayWeather?.get(selectedDate)?.second,
                     events = currentEvents,
-                    onAddEvent = { title, time ->
-                        onAddEvent(selectedDate!!, title, time)
-                    },
+                    onAddEvent = { title, time -> onAddEvent(selectedDate!!, title, time) },
                     onDeleteEvent = onDeleteEvent,
-                    onUpdateEvent = { id, title, time ->
-                        onUpdateEvent(id, selectedDate!!, title, time)
-                    },
+                    onUpdateEvent = { id, title, time -> onUpdateEvent(id, selectedDate!!, title, time) },
                 )
             }
         }
@@ -174,13 +197,77 @@ fun CalendarScreen(
 }
 
 // ─────────────────────────────────────────────
+// 选中日期简要信息（网格下方固定区域）
+// ─────────────────────────────────────────────
+
+@Composable
+private fun SelectedDateSummary(
+    selectedDate: LocalDate,
+    days: List<CalendarDayCell>,
+    todayWeather: Map<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>?,
+    todayEvents: Map<LocalDate, List<CalendarEvent>>,
+) {
+    val cell = days.find { it.date == selectedDate }
+    val weather = todayWeather?.get(selectedDate)
+    val events = todayEvents[selectedDate] ?: emptyList()
+    val holidays = Holidays.getHolidays(selectedDate)
+
+    GlassCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        alpha = 0.12f, cornerRadius = 16.dp, elevation = 4.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            // 日期行
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    selectedDate.format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINESE)),
+                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                )
+                if (cell?.lunarText != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(cell.lunarText, fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+                }
+            }
+
+            // 节日行
+            if (holidays.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    holidays.joinToString("  ") { "${it.emoji}${it.name}" },
+                    fontSize = 12.sp, color = Color(0xFFFFD54F),
+                )
+            }
+
+            // 天气行
+            if (weather != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${weather.first.icon} ${weather.first.label} ${weather.second.first}°~${weather.second.second}°",
+                    fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f),
+                )
+            }
+
+            // 事件行
+            if (events.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                events.take(2).forEach { event ->
+                    Text(
+                        "📅 ${event.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "全天"} ${event.title}",
+                        fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f), maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// 顶部导航
+// ─────────────────────────────────────────────
 
 @Composable
 private fun CalendarTopBar(
-    monthLabel: String,
-    onBack: () -> Unit,
-    onPrevMonth: () -> Unit,
-    onNextMonth: () -> Unit,
+    monthLabel: String, onBack: () -> Unit, onPrev: () -> Unit, onNext: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -190,17 +277,17 @@ private fun CalendarTopBar(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color.White)
         }
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = onPrevMonth) {
-            Icon(Icons.Default.ChevronLeft, "上月", tint = Color.White)
-        }
+        IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, "上月", tint = Color.White) }
         Text(monthLabel, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        IconButton(onClick = onNextMonth) {
-            Icon(Icons.Default.ChevronRight, "下月", tint = Color.White)
-        }
+        IconButton(onClick = onNext) { Icon(Icons.Default.ChevronRight, "下月", tint = Color.White) }
         Spacer(Modifier.weight(1f))
         Spacer(Modifier.size(48.dp))
     }
 }
+
+// ─────────────────────────────────────────────
+// 星期标题（万年历风格：周末红色/蓝色）
+// ─────────────────────────────────────────────
 
 @Composable
 private fun WeekdayHeader() {
@@ -210,62 +297,56 @@ private fun WeekdayHeader() {
     )
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         weekdays.forEach { day ->
+            val color = when (day) {
+                DayOfWeek.SATURDAY -> Color(0xFF4FC3F7)  // 蓝色
+                DayOfWeek.SUNDAY -> Color(0xFFEF5350)    // 红色
+                else -> Color.White.copy(alpha = 0.5f)
+            }
             Text(
-                text = day.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
+                day.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color,
             )
         }
     }
 }
 
 // ─────────────────────────────────────────────
-// 月视图网格 — 更紧凑的间距
+// 月视图网格（万年历风格）
 // ─────────────────────────────────────────────
 
 @Composable
 private fun MonthGrid(
-    days: List<CalendarDayCell>,
-    firstDayOfWeek: DayOfWeek,
-    today: LocalDate,
+    days: List<CalendarDayCell>, firstDayOfWeek: DayOfWeek, today: LocalDate,
     selectedDate: LocalDate?,
     weatherMap: Map<LocalDate, Pair<WeatherCondition, Pair<Int, Int>>>?,
-    onDateClick: (LocalDate) -> Unit,
-    onSwipeLeft: () -> Unit,
-    onSwipeRight: () -> Unit,
+    onDateClick: (LocalDate) -> Unit, onSwipeLeft: () -> Unit, onSwipeRight: () -> Unit,
 ) {
     if (days.isEmpty()) return
     val startOffset = (firstDayOfWeek.value - 1)
-    val totalCells = startOffset + days.size
-    val rows = (totalCells + 6) / 7
-    var dragAccumulator by remember { mutableStateOf(0f) }
+    val rows = (startOffset + days.size + 6) / 7
+    var drag by remember { mutableStateOf(0f) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 8.dp)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
-                    onDragStart = { dragAccumulator = 0f },
+                    onDragStart = { drag = 0f },
                     onDragEnd = {
-                        if (dragAccumulator > 100f) onSwipeRight()
-                        else if (dragAccumulator < -100f) onSwipeLeft()
-                        dragAccumulator = 0f
+                        if (drag > 100f) onSwipeRight() else if (drag < -100f) onSwipeLeft()
+                        drag = 0f
                     },
-                    onDragCancel = { dragAccumulator = 0f },
-                    onHorizontalDrag = { _, d -> dragAccumulator += d },
+                    onDragCancel = { drag = 0f },
+                    onHorizontalDrag = { _, d -> drag += d },
                 )
             },
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         for (row in 0 until rows) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (col in 0..6) {
                     val idx = row * 7 + col - startOffset
                     if (idx in days.indices) {
@@ -273,6 +354,7 @@ private fun MonthGrid(
                             cell = days[idx],
                             isToday = days[idx].date == today,
                             isSelected = days[idx].date == selectedDate,
+                            isWeekend = col >= 5,
                             onClick = { onDateClick(days[idx].date) },
                             modifier = Modifier.weight(1f),
                         )
@@ -286,90 +368,108 @@ private fun MonthGrid(
 }
 
 // ─────────────────────────────────────────────
-// 日期格子 — 更紧凑
+// 日期格子（万年历风格：公历大 + 农历/节日小）
 // ─────────────────────────────────────────────
 
 @Composable
 private fun DayCellView(
-    cell: CalendarDayCell,
-    isToday: Boolean,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    cell: CalendarDayCell, isToday: Boolean, isSelected: Boolean,
+    isWeekend: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
     val scale by animateFloatAsState(
-        if (isSelected) 1.08f else 1f,
-        spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh),
-        label = "s",
+        if (isSelected) 1.05f else 1f,
+        spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh), label = "s",
     )
+
+    // 背景
     val bg = when {
-        isToday && isSelected -> Color.White
-        isToday -> Color.White
-        isSelected -> Color(0xFF4FC3F7).copy(alpha = 0.3f)
+        isToday && isSelected -> Color(0xFFEF5350)  // 万年历风格：今天红色
+        isToday -> Color(0xFFEF5350)
+        isSelected -> Color.White.copy(alpha = 0.15f)
         else -> Color.Transparent
     }
-    val textColor = if (isToday) Color(0xFF1A2332) else Color.White.copy(alpha = 0.9f)
+
+    // 公历数字颜色
+    val numColor = when {
+        isToday -> Color.White
+        isWeekend -> Color(0xFFEF5350).copy(alpha = 0.8f)  // 周末红色
+        else -> Color.White.copy(alpha = 0.9f)
+    }
+
+    // 副文字（节日 > 节气 > 农历）
+    val hasHoliday = cell.holidayName != null
+    val hasLunarFestival = cell.isLunarFestival
+    val subText = cell.holidayName?.take(4) ?: cell.lunarText
+    val subColor = when {
+        hasHoliday -> Color(0xFFFFD54F)          // 节日金色
+        hasLunarFestival -> WeatherColors.LunarFestival  // 节气红色
+        else -> Color.White.copy(alpha = 0.4f)   // 普通农历灰色
+    }
 
     Column(
         modifier = modifier
             .scale(scale)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClick)
-            .padding(vertical = 1.dp),
+            .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(36.dp).clip(CircleShape).background(bg),
+        // 公历数字
+        Text(
+            "${cell.date.dayOfMonth}",
+            fontSize = 16.sp,
+            fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = numColor,
+        )
+        // 农历/节日（小字）
+        Text(
+            subText,
+            fontSize = 9.sp,
+            color = subColor,
+            maxLines = 1,
+            fontWeight = if (hasHoliday || hasLunarFestival) FontWeight.Medium else FontWeight.Normal,
+        )
+        // 事件圆点 + 天气小图标
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "${cell.date.dayOfMonth}",
-                fontSize = 15.sp,
-                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = textColor,
-            )
-        }
-        // 节气/节日 或 天气图标
-        when {
-            cell.isLunarFestival -> Text(cell.lunarText, fontSize = 9.sp, color = WeatherColors.LunarFestival, maxLines = 1, fontWeight = FontWeight.Medium)
-            cell.weatherIcon != null -> Text(cell.weatherIcon, fontSize = 10.sp)
-            else -> Spacer(Modifier.height(12.dp))
-        }
-        // 事件圆点
-        if (cell.hasEvents) {
-            Box(Modifier.size(4.dp).clip(CircleShape).background(Color(0xFF4FC3F7)))
+            if (cell.hasEvents) {
+                Box(Modifier.size(4.dp).clip(CircleShape).background(Color(0xFF4FC3F7)))
+                Spacer(Modifier.width(2.dp))
+            }
+            if (cell.weatherIcon != null) {
+                Text(cell.weatherIcon, fontSize = 9.sp)
+            }
         }
     }
 }
 
 // ─────────────────────────────────────────────
-// 底部浮层 — 事件增删改
+// 底部浮层 — 事件增删改 + 多国节日
 // ─────────────────────────────────────────────
 
 @Composable
 private fun DayDetailContent(
-    date: LocalDate,
-    lunarText: String,
-    isLunarFestival: Boolean,
-    weatherCondition: WeatherCondition?,
-    tempRange: Pair<Int, Int>?,
+    date: LocalDate, lunarText: String, isLunarFestival: Boolean,
+    holidays: List<Holidays.HolidayInfo>,
+    weatherCondition: WeatherCondition?, tempRange: Pair<Int, Int>?,
     events: List<CalendarEvent>,
     onAddEvent: (String, java.time.LocalTime?) -> Unit,
     onDeleteEvent: (Long) -> Unit,
     onUpdateEvent: (Long, String, java.time.LocalTime?) -> Unit,
 ) {
-    var showAddForm by remember { mutableStateOf(false) }
+    var showAddForm by remember { mutableStateOf(events.isEmpty()) }
     var newTitle by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editingTitle by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        // 日期标题
+        // 日期
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINESE)),
@@ -386,13 +486,27 @@ private fun DayDetailContent(
             Text(
                 "农历 $lunarText", fontSize = 13.sp,
                 color = if (isLunarFestival) WeatherColors.LunarFestival else Color.White.copy(alpha = 0.5f),
-                fontWeight = if (isLunarFestival) FontWeight.Medium else FontWeight.Normal,
             )
         }
 
-        // 天气卡
+        // 多国节日
+        if (holidays.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            holidays.forEach { h ->
+                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                    Text("${h.emoji} ", fontSize = 14.sp)
+                    Text(h.name, fontSize = 14.sp, color = Color(0xFFFFD54F), fontWeight = FontWeight.Medium)
+                    Text(
+                        when (h.country) { "CN" -> " 🇨🇳"; "SE" -> " 🇸🇪"; "US" -> " 🇺🇸"; else -> "" },
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        }
+
+        // 天气
         if (weatherCondition != null && tempRange != null) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             GlassCard(alpha = 0.12f, cornerRadius = 16.dp, elevation = 4.dp) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
@@ -417,21 +531,21 @@ private fun DayDetailContent(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("日程", fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.4f), modifier = Modifier.weight(1f))
-            Text("+ 添加", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                color = Color(0xFF4FC3F7),
-                modifier = Modifier.clickable { showAddForm = !showAddForm; newTitle = "" })
+            Text(
+                if (showAddForm) "收起" else "+ 添加",
+                fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFF4FC3F7),
+                modifier = Modifier.clickable { showAddForm = !showAddForm; newTitle = "" },
+            )
         }
         Spacer(Modifier.height(8.dp))
 
-        // 添加表单（展开在事件列表上方）
+        // 添加表单
         if (showAddForm) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
-                    value = newTitle,
-                    onValueChange = { newTitle = it },
+                    value = newTitle, onValueChange = { newTitle = it },
                     placeholder = { Text("输入事项名称", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    singleLine = true,
+                    modifier = Modifier.weight(1f).height(52.dp), singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White, unfocusedTextColor = Color.White,
@@ -443,9 +557,7 @@ private fun DayDetailContent(
                 Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
                     modifier = Modifier.clickable {
                         if (newTitle.isNotBlank()) {
-                            onAddEvent(newTitle.trim(), null)
-                            newTitle = ""
-                            showAddForm = false
+                            onAddEvent(newTitle.trim(), null); newTitle = ""; showAddForm = false
                         }
                     })
             }
@@ -466,13 +578,10 @@ private fun DayDetailContent(
                         fontSize = 13.sp, color = Color.White.copy(alpha = 0.5f),
                     )
                     Spacer(Modifier.width(10.dp))
-
                     if (editingId == event.id) {
                         OutlinedTextField(
-                            value = editingTitle,
-                            onValueChange = { editingTitle = it },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            singleLine = true,
+                            value = editingTitle, onValueChange = { editingTitle = it },
+                            modifier = Modifier.weight(1f).height(48.dp), singleLine = true,
                             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White, unfocusedTextColor = Color.White,
@@ -483,23 +592,15 @@ private fun DayDetailContent(
                         Spacer(Modifier.width(4.dp))
                         Text("✓", fontSize = 16.sp, color = Color(0xFF4FC3F7), fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
-                                if (editingTitle.isNotBlank()) {
-                                    onUpdateEvent(event.id, editingTitle.trim(), event.time)
-                                    editingId = null
-                                }
+                                if (editingTitle.isNotBlank()) { onUpdateEvent(event.id, editingTitle.trim(), event.time); editingId = null }
                             })
                         Spacer(Modifier.width(4.dp))
                         Text("✕", fontSize = 14.sp, color = Color.White.copy(alpha = 0.3f),
                             modifier = Modifier.clickable { editingId = null })
                     } else {
-                        Text(
-                            event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-                            color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).clickable {
-                                editingId = event.id; editingTitle = event.title
-                            },
-                        )
-                        // 删除按钮
+                        Text(event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).clickable { editingId = event.id; editingTitle = event.title })
                         Text("✕", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f),
                             modifier = Modifier.clickable { onDeleteEvent(event.id) }.padding(start = 8.dp))
                     }
@@ -508,27 +609,5 @@ private fun DayDetailContent(
         } else if (!showAddForm) {
             Text("暂无日程，点击上方添加", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f))
         }
-    }
-}
-
-// ─────────────────────────────────────────────
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-private fun CalendarScreenPreview() {
-    val mockDays = MockData.calendarMonth()
-    val today = LocalDate.of(2026, 4, 16)
-    val events = mapOf(
-        today to listOf(
-            CalendarEvent(1, "Team Meeting", today, java.time.LocalTime.of(10, 0), 0xFF2196F3),
-            CalendarEvent(2, "Gym", today, java.time.LocalTime.of(18, 0), 0xFF4CAF50),
-        ),
-    )
-    val weather = mapOf(today to (WeatherCondition.SUNNY to (8 to 23)))
-    WeatherCalendarTheme(dynamicColor = false) {
-        CalendarScreen(
-            monthLabel = "2026年4月", days = mockDays, firstDayOfWeek = DayOfWeek.WEDNESDAY,
-            todayEvents = events, todayWeather = weather,
-        )
     }
 }
