@@ -22,9 +22,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    alpha: Float = 0.15f,
+    alpha: Float = 0.12f,
     cornerRadius: Dp = 20.dp,
-    elevation: Dp = 8.dp,
+    elevation: Dp = 6.dp,
     isDark: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {

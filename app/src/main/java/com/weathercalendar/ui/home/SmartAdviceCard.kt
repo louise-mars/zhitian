@@ -35,7 +35,7 @@ fun SmartAdviceCard(
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
-        alpha = 0.15f,
+        alpha = 0.12f,
         cornerRadius = 20.dp,
         elevation = 4.dp,
     ) {

@@ -33,9 +33,9 @@ fun CurrentWeatherCard(
 ) {
     GlassCard(
         modifier = modifier.fillMaxWidth(),
-        alpha = 0.18f,
+        alpha = 0.15f,
         cornerRadius = 24.dp,
-        elevation = 12.dp,
+        elevation = 8.dp,
     ) {
         Column(
             modifier = Modifier

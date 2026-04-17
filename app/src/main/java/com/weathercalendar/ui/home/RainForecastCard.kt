@@ -27,7 +27,7 @@ fun RainForecastCard(
 ) {
     GlassCard(
         modifier = modifier.fillMaxWidth(),
-        alpha = if (rainForecast.isRaining) 0.20f else 0.12f,
+        alpha = if (rainForecast.isRaining) 0.15f else 0.12f,
         cornerRadius = 20.dp,
         elevation = 6.dp,
     ) {

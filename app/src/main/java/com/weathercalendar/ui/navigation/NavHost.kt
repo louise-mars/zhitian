@@ -84,6 +84,7 @@ fun WeatherCalendarNavHost() {
                 warnings = uiState.warnings,
                 todayEvents = uiState.todayEvents,
                 isLoading = uiState.isLoading,
+                fromCache = uiState.fromCache,
                 error = uiState.error,
                 tempUnit = uiState.tempUnit,
                 onCityClick = { showCityPicker = true },

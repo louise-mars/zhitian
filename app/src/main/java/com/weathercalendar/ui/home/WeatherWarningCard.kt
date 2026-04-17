@@ -30,7 +30,7 @@ fun WeatherWarningCard(
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
-        alpha = 0.20f,
+        alpha = 0.15f,
         cornerRadius = 20.dp,
         elevation = 8.dp,
     ) {

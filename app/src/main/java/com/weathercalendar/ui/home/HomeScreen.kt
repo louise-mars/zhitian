@@ -80,6 +80,7 @@ fun HomeScreen(
     warnings: List<WeatherWarning> = emptyList(),
     todayEvents: List<com.weathercalendar.data.model.CalendarEvent> = emptyList(),
     isLoading: Boolean = false,
+    fromCache: Boolean = false,
     error: String? = null,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
     onCityClick: () -> Unit = {},
@@ -130,6 +131,18 @@ fun HomeScreen(
                             onShareClick = onShareClick,
                             modifier = Modifier.padding(horizontal = 20.dp),
                         )
+
+                        // 离线模式提示
+                        if (fromCache && !isLoading) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = "📡 离线模式，显示缓存数据",
+                                fontSize = 12.sp,
+                                color = textColor.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
 
                         Spacer(Modifier.height(16.dp))
 
