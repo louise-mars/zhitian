@@ -1,8 +1,12 @@
 package com.weathercalendar.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,210 +88,180 @@ fun HomeScreen(
     onShareClick: () -> Unit = {},
     onRefresh: () -> Unit = {},
 ) {
-    // 当前聚焦的天（用于 pager 和渐变色）
     val pageCount = threeDays.size.coerceIn(1, 3)
     val pagerState = rememberPagerState(pageCount = { pageCount })
     val focusedDay = threeDays.getOrNull(pagerState.currentPage)
-
-    // 渐变色跟随聚焦天的天气动画过渡
     val focusedCondition = focusedDay?.weather?.condition ?: currentWeather.condition
     val gradient = WeatherColors.gradientFor(focusedCondition, currentWeather.isDay)
-    val animatedStart by animateColorAsState(gradient.start, tween(500), label = "gradStart")
-    val animatedEnd by animateColorAsState(gradient.end, tween(500), label = "gradEnd")
+    val animatedStart by animateColorAsState(gradient.start, tween(500), label = "s")
+    val animatedEnd by animateColorAsState(gradient.end, tween(500), label = "e")
     val textColor = WeatherColors.textColorOn(focusedCondition, currentWeather.isDay)
 
-    // 融合卡展开索引跟随 pager
     var fusionExpandedIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(pagerState.currentPage) {
-        fusionExpandedIndex = pagerState.currentPage
-    }
+    LaunchedEffect(pagerState.currentPage) { fusionExpandedIndex = pagerState.currentPage }
 
-    PullToRefreshBox(
-        isRefreshing = isLoading,
-        onRefresh = onRefresh,
-    ) {
+    // 折叠状态
+    var showForecastDetail by remember { mutableStateOf(false) }
+    var showMoreInfo by remember { mutableStateOf(false) }
+
+    PullToRefreshBox(isRefreshing = isLoading, onRefresh = onRefresh) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(listOf(animatedStart, animatedEnd))),
         ) {
-            // 天气动态粒子动画层
-            WeatherAnimationOverlay(
-                condition = focusedCondition,
-                isDay = currentWeather.isDay,
-            )
+            WeatherAnimationOverlay(condition = focusedCondition, isDay = currentWeather.isDay)
 
             when {
-                isLoading && hourlyForecast.isEmpty() -> {
-                    LoadingContent(textColor = textColor)
-                }
-                error != null && hourlyForecast.isEmpty() -> {
-                    ErrorContent(error = error, textColor = textColor, onRetry = onRefresh)
-                }
+                isLoading && hourlyForecast.isEmpty() -> LoadingContent(textColor)
+                error != null && hourlyForecast.isEmpty() -> ErrorContent(error, textColor, onRefresh)
                 else -> {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
+                        modifier = Modifier.fillMaxSize().statusBarsPadding()
                             .verticalScroll(rememberScrollState()),
                     ) {
                         Spacer(Modifier.height(16.dp))
 
+                        // ═══ 第一屏：核心信息（不滚动就能看到） ═══
+
                         HeaderBar(
-                            cityName = cityName,
-                            dateText = dateText,
-                            lunarText = lunarText,
-                            textColor = textColor,
-                            onCityClick = onCityClick,
-                            onCalendarClick = onCalendarClick,
-                            onSettingsClick = onSettingsClick,
+                            cityName = cityName, dateText = dateText, lunarText = lunarText,
+                            textColor = textColor, onCityClick = onCityClick,
+                            onCalendarClick = onCalendarClick, onSettingsClick = onSettingsClick,
                             onShareClick = onShareClick,
                             modifier = Modifier.padding(horizontal = 20.dp),
                         )
 
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(16.dp))
 
-                        // ── Hero Card: 左右滑切换日期 ──
+                        // 天气卡
                         if (threeDays.isNotEmpty()) {
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { page ->
+                            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth()) { page ->
                                 val day = threeDays[page]
                                 CurrentWeatherCard(
                                     weather = if (page == 0) currentWeather else CurrentWeather(
                                         temperature = (day.weather.tempMax + day.weather.tempMin) / 2,
                                         feelsLike = (day.weather.tempMax + day.weather.tempMin) / 2,
-                                        condition = day.weather.condition,
-                                        isDay = currentWeather.isDay,
+                                        condition = day.weather.condition, isDay = currentWeather.isDay,
                                     ),
-                                    textColor = textColor,
+                                    textColor = textColor, tempUnit = tempUnit,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            PageIndicator(pageCount, pagerState.currentPage, textColor)
+                        } else {
+                            CurrentWeatherCard(
+                                weather = currentWeather, textColor = textColor, tempUnit = tempUnit,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // 一句话智能建议
+                        SmartAdviceCard(
+                            currentWeather = currentWeather, todayInfo = threeDays.firstOrNull(),
+                            rainForecast = rainForecast, textColor = textColor,
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // 小时预报
+                        if (hourlyForecast.isNotEmpty()) {
+                            HourlyForecastRow(items = hourlyForecast, textColor = textColor, tempUnit = tempUnit)
+                        }
+
+                        // ═══ 第二屏：预警 + 降雨 + 7天预报 ═══
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // 预警（有才显示）
+                        if (warnings.isNotEmpty()) {
+                            WeatherWarningCard(warnings = warnings, modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        // 降雨预报（有才显示）
+                        if (rainForecast != null) {
+                            RainForecastCard(rainForecast = rainForecast, textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        // 7天预报（可折叠：默认只显示趋势图，点击展开列表）
+                        if (threeDays.isNotEmpty()) {
+                            CollapsibleSection(
+                                title = "7日预报",
+                                textColor = textColor,
+                                expanded = showForecastDetail,
+                                onToggle = { showForecastDetail = !showForecastDetail },
+                            ) {
+                                TemperatureChart(days = threeDays, textColor = textColor)
+                            }
+
+                            AnimatedVisibility(
+                                visible = showForecastDetail,
+                                enter = expandVertically(),
+                                exit = shrinkVertically(),
+                            ) {
+                                DailyWeatherCalendarCard(
+                                    days = threeDays, textColor = textColor,
+                                    expandedIndex = fusionExpandedIndex,
+                                    onExpandedChange = { fusionExpandedIndex = it },
                                     tempUnit = tempUnit,
                                     modifier = Modifier.padding(horizontal = 20.dp),
                                 )
                             }
-
-                            // 页面指示器
-                            Spacer(Modifier.height(12.dp))
-                            PageIndicator(
-                                pageCount = pageCount,
-                                currentPage = pagerState.currentPage,
-                                textColor = textColor,
-                            )
-                        } else {
-                            CurrentWeatherCard(
-                                weather = currentWeather,
-                                textColor = textColor,
-                                tempUnit = tempUnit,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
-                        }
-
-                        Spacer(Modifier.height(24.dp))
-
-                        if (hourlyForecast.isNotEmpty()) {
-                            SectionLabel("小时预报", textColor)
-                            Spacer(Modifier.height(12.dp))
-                            HourlyForecastRow(
-                                items = hourlyForecast,
-                                textColor = textColor,
-                                tempUnit = tempUnit,
-                            )
-                            Spacer(Modifier.height(24.dp))
-                        }
-
-                        // ── 一句话智能建议 ──
-                        SmartAdviceCard(
-                            currentWeather = currentWeather,
-                            todayInfo = threeDays.firstOrNull(),
-                            rainForecast = rainForecast,
-                            textColor = textColor,
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                        )
-                        Spacer(Modifier.height(12.dp))
-
-                        // ── 天气预警 ──
-                        if (warnings.isNotEmpty()) {
-                            WeatherWarningCard(
-                                warnings = warnings,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
-                            Spacer(Modifier.height(12.dp))
-                        }
-
-                        // ── 分钟级降雨预报 ──
-                        if (rainForecast != null) {
-                            RainForecastCard(
-                                rainForecast = rainForecast,
-                                textColor = textColor,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
                             Spacer(Modifier.height(16.dp))
                         }
 
-                        if (threeDays.isNotEmpty()) {
-                            SectionLabel("7日预报", textColor)
-                            Spacer(Modifier.height(8.dp))
-                            TemperatureChart(
-                                days = threeDays,
-                                textColor = textColor,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            DailyWeatherCalendarCard(
-                                days = threeDays,
-                                textColor = textColor,
-                                expandedIndex = fusionExpandedIndex,
-                                onExpandedChange = { fusionExpandedIndex = it },
-                                tempUnit = tempUnit,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
-                            Spacer(Modifier.height(24.dp))
-                        }
+                        // ═══ 第三屏：日程 + 更多信息 ═══
 
-                        // ── 今日日程 ──
+                        // 今日日程 + 明日概览
                         if (todayEvents.isNotEmpty()) {
-                            TodayEventsCard(
-                                events = todayEvents,
-                                textColor = textColor,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
-                            Spacer(Modifier.height(16.dp))
+                            TodayEventsCard(events = todayEvents, textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(12.dp))
                         }
 
-                        // ── 明日概览 ──
                         if (threeDays.size >= 2) {
-                            TomorrowOverviewCard(
-                                tomorrowInfo = threeDays[1],
-                                textColor = textColor,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
-                            Spacer(Modifier.height(16.dp))
+                            TomorrowOverviewCard(tomorrowInfo = threeDays[1], textColor = textColor,
+                                modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(12.dp))
                         }
 
-                        // ── 生活指数 ──
-                        LifeIndexCard(
-                            currentWeather = currentWeather,
-                            todayInfo = threeDays.firstOrNull(),
-                            windSpeed = weatherDetails.windSpeed,
+                        // 更多信息（可折叠：生活指数 + 日出日落 + 详情）
+                        CollapsibleSection(
+                            title = "更多信息",
                             textColor = textColor,
-                            modifier = Modifier.padding(horizontal = 20.dp),
+                            expanded = showMoreInfo,
+                            onToggle = { showMoreInfo = !showMoreInfo },
                         )
-                        Spacer(Modifier.height(16.dp))
 
-                        // ── 日出日落 ──
-                        SunriseSunsetCard(
-                            sunrise = weatherDetails.sunrise,
-                            sunset = weatherDetails.sunset,
-                            textColor = textColor,
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                        )
-                        Spacer(Modifier.height(16.dp))
-
-                        ExpandableDetailsCard(
-                            details = weatherDetails,
-                            textColor = textColor,
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                        )
+                        AnimatedVisibility(
+                            visible = showMoreInfo,
+                            enter = expandVertically(),
+                            exit = shrinkVertically(),
+                        ) {
+                            Column {
+                                LifeIndexCard(
+                                    currentWeather = currentWeather, todayInfo = threeDays.firstOrNull(),
+                                    windSpeed = weatherDetails.windSpeed, textColor = textColor,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                SunriseSunsetCard(
+                                    sunrise = weatherDetails.sunrise, sunset = weatherDetails.sunset,
+                                    textColor = textColor, modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                ExpandableDetailsCard(
+                                    details = weatherDetails, textColor = textColor,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                            }
+                        }
 
                         Spacer(Modifier.height(32.dp))
                         Spacer(Modifier.navigationBarsPadding())
@@ -295,22 +272,53 @@ fun HomeScreen(
     }
 }
 
+// ─────────────────────────────────────────────
+// 可折叠区块标题
+// ─────────────────────────────────────────────
+
+@Composable
+private fun CollapsibleSection(
+    title: String,
+    textColor: Color,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title, color = textColor,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = if (expanded) "收起" else "展开",
+            tint = textColor.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp),
+        )
+    }
+    content?.invoke()
+}
+
+// ─────────────────────────────────────────────
+
 @Composable
 private fun PageIndicator(pageCount: Int, currentPage: Int, textColor: Color) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
         repeat(pageCount) { index ->
             Box(
                 modifier = Modifier
                     .padding(horizontal = 4.dp)
                     .size(if (index == currentPage) 8.dp else 6.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (index == currentPage) textColor
-                        else textColor.copy(alpha = 0.3f)
-                    ),
+                    .background(if (index == currentPage) textColor else textColor.copy(alpha = 0.3f)),
             )
         }
     }
@@ -336,7 +344,7 @@ private fun ErrorContent(error: String, textColor: Color, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "😔", fontSize = 48.sp)
+        Text("😔", fontSize = 48.sp)
         Spacer(Modifier.height(16.dp))
         Text(error, color = textColor, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))
@@ -348,18 +356,9 @@ private fun ErrorContent(error: String, textColor: Color, onRetry: () -> Unit) {
     }
 }
 
-@Composable
-private fun SectionLabel(title: String, textColor: Color) {
-    Text(
-        text = title, color = textColor,
-        style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(horizontal = 20.dp),
-    )
-}
-
 // ── Previews ──
 
-@Preview(showBackground = true, showSystemUi = true, name = "HomeScreen — 晴天")
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun HomeScreenPreview() {
     WeatherCalendarTheme(dynamicColor = false) {
@@ -367,33 +366,6 @@ private fun HomeScreenPreview() {
             cityName = "北京", dateText = "4月16日 星期三", lunarText = "三月十九",
             currentWeather = MockData.currentWeather, hourlyForecast = MockData.hourlyForecast,
             threeDays = MockData.threeDays, weatherDetails = MockData.weatherDetails,
-        )
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true, name = "HomeScreen — Loading")
-@Composable
-private fun HomeScreenLoadingPreview() {
-    WeatherCalendarTheme(dynamicColor = false) {
-        HomeScreen(
-            cityName = "定位中...", dateText = "", lunarText = "",
-            currentWeather = CurrentWeather(0, 0, WeatherCondition.SUNNY),
-            hourlyForecast = emptyList(), threeDays = emptyList(),
-            weatherDetails = WeatherDetails(0, 0, "—", "—"), isLoading = true,
-        )
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true, name = "HomeScreen — Error")
-@Composable
-private fun HomeScreenErrorPreview() {
-    WeatherCalendarTheme(dynamicColor = false) {
-        HomeScreen(
-            cityName = "北京", dateText = "4月16日 星期三", lunarText = "三月十九",
-            currentWeather = CurrentWeather(0, 0, WeatherCondition.SUNNY),
-            hourlyForecast = emptyList(), threeDays = emptyList(),
-            weatherDetails = WeatherDetails(0, 0, "—", "—"),
-            error = "网络连接失败，请检查网络后重试",
         )
     }
 }
