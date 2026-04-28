@@ -172,7 +172,11 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = false) }
                 return
             }
-            _uiState.update { it.copy(isLoading = false, error = "天气加载失败: ${e.message}") }
+            val errorMsg = when (e) {
+                is java.io.IOException -> "网络连接失败，请检查网络"
+                else -> "天气加载失败，请稍后重试"
+            }
+            _uiState.update { it.copy(isLoading = false, error = errorMsg) }
             return
         }
 

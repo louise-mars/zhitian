@@ -206,6 +206,14 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
+                if (searchResults.isEmpty() && cityQuery.length >= 2) {
+                    Text(
+                        "未找到匹配城市",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
                 searchResults.forEach { result ->
                     Row(
                         modifier = Modifier

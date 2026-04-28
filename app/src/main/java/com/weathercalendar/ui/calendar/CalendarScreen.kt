@@ -43,6 +43,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,15 @@ fun CalendarScreen(
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var swipeDirection by remember { mutableIntStateOf(0) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+
+    // 自动消失反馈
+    LaunchedEffect(feedbackMessage) {
+        if (feedbackMessage != null) {
+            kotlinx.coroutines.delay(1500)
+            feedbackMessage = null
+        }
+    }
 
     val selectedCondition = selectedDate?.let { todayWeather?.get(it)?.first } ?: WeatherCondition.SUNNY
     val gradient = WeatherColors.calendarGradientFor(selectedCondition)
@@ -152,6 +162,25 @@ fun CalendarScreen(
             )
         }
 
+        // 操作反馈提示
+        if (feedbackMessage != null) {
+            Box(
+                modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Text(
+                    feedbackMessage!!,
+                    modifier = Modifier
+                        .padding(top = 60.dp)
+                        .background(Color(0xFF2E7D32).copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
         // 右下角浮动添加按钮
         Box(
             modifier = Modifier.fillMaxSize().padding(20.dp).statusBarsPadding(),
@@ -187,9 +216,18 @@ fun CalendarScreen(
                     weatherCondition = todayWeather?.get(selectedDate)?.first,
                     tempRange = todayWeather?.get(selectedDate)?.second,
                     events = currentEvents,
-                    onAddEvent = { title, time -> onAddEvent(selectedDate!!, title, time) },
-                    onDeleteEvent = onDeleteEvent,
-                    onUpdateEvent = { id, title, time -> onUpdateEvent(id, selectedDate!!, title, time) },
+                    onAddEvent = { title, time ->
+                        onAddEvent(selectedDate!!, title, time)
+                        feedbackMessage = "✓ 已添加"
+                    },
+                    onDeleteEvent = { id ->
+                        onDeleteEvent(id)
+                        feedbackMessage = "✓ 已删除"
+                    },
+                    onUpdateEvent = { id, title, time ->
+                        onUpdateEvent(id, selectedDate!!, title, time)
+                        feedbackMessage = "✓ 已更新"
+                    },
                 )
             }
         }
@@ -556,8 +594,9 @@ private fun DayDetailContent(
                 Spacer(Modifier.width(8.dp))
                 Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
                     modifier = Modifier.clickable {
-                        if (newTitle.isNotBlank()) {
-                            onAddEvent(newTitle.trim(), null); newTitle = ""; showAddForm = false
+                        val trimmed = newTitle.trim()
+                        if (trimmed.length in 1..50) {
+                            onAddEvent(trimmed, null); newTitle = ""; showAddForm = false
                         }
                     })
             }
