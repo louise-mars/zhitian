@@ -104,6 +104,16 @@ fun HomeScreen(
     // 折叠状态
     var showForecastDetail by remember { mutableStateOf(true) }
     var showMoreInfo by remember { mutableStateOf(true) }
+    var refreshFeedback by remember { mutableStateOf(false) }
+
+    // 刷新完成反馈
+    LaunchedEffect(isLoading) {
+        if (!isLoading && hourlyForecast.isNotEmpty() && !fromCache) {
+            refreshFeedback = true
+            kotlinx.coroutines.delay(2000)
+            refreshFeedback = false
+        }
+    }
 
     PullToRefreshBox(isRefreshing = isLoading, onRefresh = onRefresh) {
         Box(
@@ -279,6 +289,24 @@ fun HomeScreen(
                         Spacer(Modifier.height(32.dp))
                         Spacer(Modifier.navigationBarsPadding())
                     }
+                }
+            }
+
+            // 刷新成功反馈
+            if (refreshFeedback) {
+                Box(
+                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Text(
+                        "✓ 已更新",
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .background(Color(0xFF2E7D32).copy(alpha = 0.85f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                    )
                 }
             }
         }
