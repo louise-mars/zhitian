@@ -53,17 +53,17 @@ object WeatherColors {
         if (!isDay) return GradientPair(Color(0xFF141E30), Color(0xFF243B55))
         return when (condition) {
             WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY ->
-                GradientPair(Color(0xFF5B9BD5), Color(0xFF3A7BBF))
+                GradientPair(Color(0xFF3A6B9F), Color(0xFF1E4A7A))
             WeatherCondition.CLOUDY ->
-                GradientPair(Color(0xFF8AA0B0), Color(0xFF4A6070))
+                GradientPair(Color(0xFF5A7080), Color(0xFF3A4E5A))
             WeatherCondition.FOGGY ->
-                GradientPair(Color(0xFF95A8B5), Color(0xFF5A7585))
+                GradientPair(Color(0xFF6A8090), Color(0xFF4A6070))
             WeatherCondition.DRIZZLE, WeatherCondition.RAINY ->
-                GradientPair(Color(0xFF5A8A8C), Color(0xFF2C4A4C))
+                GradientPair(Color(0xFF4A7072), Color(0xFF1E3A3C))
             WeatherCondition.SNOWY ->
-                GradientPair(Color(0xFFC0D4E4), Color(0xFF7A9AB0))
+                GradientPair(Color(0xFF8AAABE), Color(0xFF5A7A90))
             WeatherCondition.STORMY ->
-                GradientPair(Color(0xFF3D4E5C), Color(0xFF1A252F))
+                GradientPair(Color(0xFF2E3E4A), Color(0xFF141E28))
         }
     }
 

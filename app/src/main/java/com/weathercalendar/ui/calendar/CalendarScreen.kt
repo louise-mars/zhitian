@@ -456,14 +456,14 @@ private fun DayCellView(
         // 公历数字
         Text(
             "${cell.date.dayOfMonth}",
-            fontSize = 16.sp,
+            fontSize = 18.sp,
             fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
             color = numColor,
         )
         // 农历/节日（小字）
         Text(
             subText,
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             color = subColor,
             maxLines = 1,
             fontWeight = if (hasHoliday || hasLunarFestival) FontWeight.Medium else FontWeight.Normal,
@@ -478,7 +478,7 @@ private fun DayCellView(
                 Spacer(Modifier.width(2.dp))
             }
             if (cell.weatherIcon != null) {
-                Text(cell.weatherIcon, fontSize = 9.sp)
+                Text(cell.weatherIcon, fontSize = 11.sp)
             }
         }
     }
