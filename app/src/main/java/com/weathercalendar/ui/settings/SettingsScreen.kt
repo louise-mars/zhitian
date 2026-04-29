@@ -261,7 +261,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable {
-                    uriHandler.openUri("https://github.com/louise-mars/kiro/blob/main/docs/PRIVACY_POLICY.md")
+                    uriHandler.openUri("https://github.com/louise-mars/zhitian/blob/main/docs/PRIVACY_POLICY.md")
                 },
             )
 

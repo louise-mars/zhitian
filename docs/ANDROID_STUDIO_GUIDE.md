@@ -23,7 +23,7 @@
 
 ### 从 GitHub 克隆
 - File → New → Project from Version Control
-- URL: `https://github.com/louise-mars/kiro.git`
+- URL: `https://github.com/louise-mars/zhitian.git`
 - 点击 Clone
 
 ### Gradle 同步失败？
