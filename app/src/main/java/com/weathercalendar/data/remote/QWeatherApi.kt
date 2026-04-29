@@ -64,7 +64,7 @@ interface QWeatherApi {
 
     companion object {
         const val BASE_URL = "https://devapi.qweather.com/"
-        const val API_KEY = "REDACTED"
+        val API_KEY: String get() = com.weathercalendar.BuildConfig.QWEATHER_API_KEY
     }
 }
 

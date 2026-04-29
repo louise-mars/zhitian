@@ -39,15 +39,20 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(
+
+        // 只在 debug 版本打印网络日志
+        if (com.weathercalendar.BuildConfig.DEBUG) {
+            builder.addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BASIC
                 }
             )
-            .build()
+        }
+
+        return builder.build()
     }
 
     @Provides
@@ -146,6 +151,7 @@ object AppModule {
             "weather_calendar.db",
         )
             .addMigrations(AppDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigration()
             .build()
     }
 
