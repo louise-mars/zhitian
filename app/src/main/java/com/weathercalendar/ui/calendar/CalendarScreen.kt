@@ -434,14 +434,19 @@ private fun DayCellView(
         else -> Color.White.copy(alpha = 0.9f)
     }
 
-    // 副文字（节日 > 节气 > 农历）
+    // 副文字：农历节日 > 公历节日 > 节气 > 农历日
     val hasHoliday = cell.holidayName != null
     val hasLunarFestival = cell.isLunarFestival
-    val subText = cell.holidayName?.take(4) ?: cell.lunarText
+    // 农历节日优先（端午、中秋等），然后公历节日，最后普通农历
+    val subText = when {
+        hasLunarFestival && cell.lunarText.length <= 4 -> cell.lunarText  // 端午、中秋、春节等
+        hasHoliday -> cell.holidayName!!.take(4)
+        else -> cell.lunarText
+    }
     val subColor = when {
-        hasHoliday -> Color(0xFFFFD54F)          // 节日金色
-        hasLunarFestival -> WeatherColors.LunarFestival  // 节气红色
-        else -> Color.White.copy(alpha = 0.4f)   // 普通农历灰色
+        hasLunarFestival -> WeatherColors.LunarFestival  // 农历节日/节气红色
+        hasHoliday -> Color(0xFFFFD54F)                  // 公历节日金色
+        else -> Color.White.copy(alpha = 0.4f)           // 普通农历灰色
     }
 
     Column(

@@ -20,8 +20,6 @@ object Holidays {
     fun getHolidays(date: LocalDate): List<HolidayInfo> {
         return buildList {
             getChineseSolarHoliday(date)?.let { add(it) }
-            getSwedishHoliday(date)?.let { add(it) }
-            getUSHoliday(date)?.let { add(it) }
         }
     }
 
