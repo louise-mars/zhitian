@@ -12,6 +12,8 @@ import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.OpenMeteoResponse
 import com.weathercalendar.data.remote.WeatherApi
 import com.weathercalendar.data.remote.WeatherCodeMapper
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -54,8 +56,13 @@ class WeatherRepository @Inject constructor(
      * 3. 和风失败 → fallback 到 Open-Meteo
      * 4. 成功后写入缓存
      */
-    suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
+    suspend fun getWeather(latitude: Double, longitude: Double, forceRefresh: Boolean = false): Result<WeatherData> {
         val cacheKey = WeatherEntity.key(latitude, longitude)
+
+        // 强制刷新时跳过缓存
+        if (forceRefresh) {
+            return fetchAndCache(latitude, longitude, cacheKey, staleCache = dao.get(cacheKey))
+        }
 
         // 1. 读缓存（纯本地，不触发任何网络请求）
         val cached = dao.get(cacheKey)
@@ -99,62 +106,62 @@ class WeatherRepository @Inject constructor(
         longitude: Double,
         cacheKey: String,
         staleCache: WeatherEntity?,
-    ): Result<WeatherData> {
-        // AQI 只在网络刷新时请求
-        val aqiLabel = fetchAqi(latitude, longitude)
-
-        // 1. 尝试和风天气（中国区主数据源）
-        val qResult = try {
-            qWeatherRepository.getWeather(latitude, longitude)
-        } catch (_: Exception) {
-            Result.failure(Exception("QWeather failed"))
+    ): Result<WeatherData> = coroutineScope {
+        // 并行请求：和风天气 + Open-Meteo + AQI
+        val qDeferred = async {
+            try { qWeatherRepository.getWeather(latitude, longitude) }
+            catch (_: Exception) { Result.failure(Exception("QWeather failed")) }
         }
+        val omDeferred = async {
+            try { retryWithBackoff { api.getForecast(latitude, longitude) } }
+            catch (e: Exception) { null }
+        }
+        val aqiDeferred = async { fetchAqi(latitude, longitude) }
 
-        if (qResult.isSuccess) {
-            val qData = qResult.getOrThrow()
+        val aqiLabel = aqiDeferred.await()
+        val qResult = qDeferred.await()
+        val omResponse = omDeferred.await()
 
-            // 和风免费版只返回 3 天，用 Open-Meteo 补充 4-7 天
-            var mergedData = qData
+        // 缓存 Open-Meteo 数据
+        if (omResponse != null) {
             try {
-                val omResponse = retryWithBackoff { api.getForecast(latitude, longitude) }
                 val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), omResponse)
                 dao.insert(WeatherEntity(cacheKey = cacheKey, responseJson = responseJson, updatedAt = System.currentTimeMillis()))
                 dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
-
-                // 合并：和风的前 N 天 + Open-Meteo 补充剩余天数
-                val omData = mapResponse(omResponse, fromCache = false, aqiLabel = aqiLabel)
-                val qDates = qData.daily.map { it.date }.toSet()
-                val extraDays = omData.daily.filter { it.date !in qDates }
-                if (extraDays.isNotEmpty()) {
-                    mergedData = qData.copy(daily = qData.daily + extraDays)
-                }
-            } catch (_: Exception) {
-                // Open-Meteo 失败不影响，用和风的数据
-            }
-            return Result.success(mergedData)
+            } catch (_: Exception) {}
         }
 
-        // 2. 和风失败 → fallback 到 Open-Meteo
-        return try {
-            val response = retryWithBackoff { api.getForecast(latitude, longitude) }
-
-            val responseJson = json.encodeToString(OpenMeteoResponse.serializer(), response)
-            dao.insert(WeatherEntity(cacheKey = cacheKey, responseJson = responseJson, updatedAt = System.currentTimeMillis()))
-            dao.deleteOlderThan(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
-
-            Result.success(mapResponse(response, fromCache = false, aqiLabel = aqiLabel))
-        } catch (e: Exception) {
-            if (staleCache != null) {
+        // 1. 和风天气成功 → 合并 Open-Meteo 补充天数
+        if (qResult.isSuccess) {
+            val qData = qResult.getOrThrow()
+            var mergedData = qData
+            if (omResponse != null) {
                 try {
-                    val response = json.decodeFromString<OpenMeteoResponse>(staleCache.responseJson)
-                    Result.success(mapResponse(response, fromCache = true, aqiLabel = aqiLabel))
-                } catch (_: Exception) {
-                    Result.failure(e)
-                }
-            } else {
-                Result.failure(e)
+                    val omData = mapResponse(omResponse, fromCache = false, aqiLabel = aqiLabel)
+                    val qDates = qData.daily.map { it.date }.toSet()
+                    val extraDays = omData.daily.filter { it.date !in qDates }
+                    if (extraDays.isNotEmpty()) {
+                        mergedData = qData.copy(daily = qData.daily + extraDays)
+                    }
+                } catch (_: Exception) {}
             }
+            return@coroutineScope Result.success(mergedData)
         }
+
+        // 2. 和风失败 → 用 Open-Meteo
+        if (omResponse != null) {
+            return@coroutineScope Result.success(mapResponse(omResponse, fromCache = false, aqiLabel = aqiLabel))
+        }
+
+        // 3. 都失败 → 用旧缓存
+        if (staleCache != null) {
+            try {
+                val response = json.decodeFromString<OpenMeteoResponse>(staleCache.responseJson)
+                return@coroutineScope Result.success(mapResponse(response, fromCache = true, aqiLabel = aqiLabel))
+            } catch (_: Exception) {}
+        }
+
+        Result.failure(Exception("All weather sources failed"))
     }
 
     private fun mapResponse(response: OpenMeteoResponse, fromCache: Boolean, aqiLabel: String = "—"): WeatherData {

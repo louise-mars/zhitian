@@ -25,6 +25,20 @@ object WeatherWidgetDataProvider {
         coerceInputValues = true
     }
 
+    // 复用数据库实例，避免每次 Widget 刷新都重新创建
+    @Volatile
+    private var dbInstance: AppDatabase? = null
+
+    private fun getDatabase(context: Context): AppDatabase {
+        return dbInstance ?: synchronized(this) {
+            dbInstance ?: Room.databaseBuilder(
+                context.applicationContext,
+                AppDatabase::class.java,
+                "weather_calendar.db",
+            ).fallbackToDestructiveMigration().build().also { dbInstance = it }
+        }
+    }
+
     suspend fun fetchData(context: Context): WeatherWidgetData {
         val today = LocalDate.now()
         val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINESE)
@@ -37,16 +51,9 @@ object WeatherWidgetDataProvider {
         val lon = cityInfo.third
 
         return try {
-            // 读 Room 缓存（和 App 共享同一个数据库）
-            val db = Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                "weather_calendar.db",
-            ).build()
-
+            val db = getDatabase(context)
             val cacheKey = WeatherEntity.key(lat, lon)
             val cached = db.weatherDao().get(cacheKey)
-            db.close()
 
             if (cached != null) {
                 val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)

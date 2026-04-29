@@ -164,8 +164,8 @@ class HomeViewModel @Inject constructor(
         WeatherWidgetDataProvider.saveCityForWidget(appContext, city, lat, lon)
         _uiState.update { it.copy(cityName = city) }
 
-        // 强制刷新天气（即使缓存未过期，阶段二也会触发网络请求）
-        val result = weatherRepository.getWeather(lat, lon)
+        // 强制刷新天气（跳过缓存，触发网络请求）
+        val result = weatherRepository.getWeather(lat, lon, forceRefresh = true)
         val data = result.getOrElse { e ->
             // 阶段一已经有数据了，静默失败
             if (_uiState.value.hourlyForecast.isNotEmpty()) {
