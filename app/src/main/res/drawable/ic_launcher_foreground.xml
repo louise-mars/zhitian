@@ -5,46 +5,46 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 远山（水墨淡影） -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.2"
-        android:pathData="M10,78 Q30,52 54,68 Q70,48 98,72 L98,90 L10,90 Z" />
-
-    <!-- 近山（水墨浓影） -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.35"
-        android:pathData="M5,85 Q25,62 45,78 Q55,58 75,72 Q85,64 103,80 L103,95 L5,95 Z" />
-
-    <!-- 祥云（上方，古典云纹） -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.9"
-        android:pathData="M30,42 C30,35 36,30 43,30 C45,25 50,22 57,22 C64,22 69,26 70,32 C74,32 78,35 78,40 C78,45 74,48 69,48 L36,48 C32,48 30,46 30,42 Z" />
-
-    <!-- 小祥云 -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.5"
-        android:pathData="M62,38 C62,34 66,31 70,31 C71,28 74,26 78,26 C82,26 85,28.5 85,32 C87,32 89,34 89,37 C89,40 87,42 84,42 L66,42 C63,42 62,40 62,38 Z" />
-
-    <!-- 月牙（右上角，代表"知天"的天） -->
+    <!-- 金色太阳光晕（右上角，大面积柔和光效） -->
     <path
         android:fillColor="#FFD54F"
-        android:pathData="M76,20 A9,9 0,1 1,76,38 A7,7 0,1 0,76,20 Z" />
+        android:fillAlpha="0.3"
+        android:pathData="M75,25m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
 
-    <!-- 三颗星（点缀） -->
+    <!-- 太阳核心（实心金色） -->
     <path
         android:fillColor="#FFD54F"
-        android:fillAlpha="0.7"
-        android:pathData="M25,22 L26,25 L29,25 L26.5,27 L27.5,30 L25,28 L22.5,30 L23.5,27 L21,25 L24,25 Z" />
+        android:pathData="M75,25m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+
+    <!-- 太阳光芒 -->
     <path
-        android:fillColor="#FFD54F"
-        android:fillAlpha="0.5"
-        android:pathData="M40,16 L40.7,18 L42.7,18 L41,19.2 L41.7,21.2 L40,20 L38.3,21.2 L39,19.2 L37.3,18 L39.3,18 Z" />
+        android:strokeColor="#FFD54F"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M75,9V13 M75,37V41 M59,25H63 M87,25H91 M64,14L67,17 M83,33L86,36 M64,36L67,33 M83,17L86,14" />
+
+    <!-- "知"字 — 简化书法风格（白色，居中偏左下） -->
+    <!-- 矢 部分 -->
     <path
-        android:fillColor="#FFD54F"
-        android:fillAlpha="0.4"
-        android:pathData="M18,34 L18.5,35.5 L20,35.5 L18.8,36.4 L19.3,37.9 L18,37 L16.7,37.9 L17.2,36.4 L16,35.5 L17.5,35.5 Z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,45 L24,82 C24,82 24,84 26,84 C28,84 28,82 28,82 L28,45 C28,45 28,43 26,43 C24,43 24,45 24,45 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,56 L36,56 C37,56 38,55 38,54 C38,53 37,52 36,52 L18,52 C17,52 16,53 16,54 C16,55 17,56 18,56 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,68 L36,68 C37,68 38,67 38,66 C38,65 37,64 36,64 L18,64 C17,64 16,65 16,66 C16,67 17,68 18,68 Z" />
+
+    <!-- 口 部分 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,48 L44,72 L66,72 L66,48 Z M48,52 L62,52 L62,68 L48,68 Z" />
+
+    <!-- 底部装饰弧线（代表地平线/日出） -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M20,90 Q54,80 88,90" />
 </vector>
