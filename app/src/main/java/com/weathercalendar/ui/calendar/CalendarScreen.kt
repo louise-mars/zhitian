@@ -108,10 +108,10 @@ fun CalendarScreen(
     val animEnd by animateColorAsState(gradient.end, tween(600), label = "e")
     val animBottom by animateColorAsState(
         when (selectedCondition) {
-            WeatherCondition.RAINY, WeatherCondition.DRIZZLE, WeatherCondition.STORMY -> Color(0xFF1A2332)
-            WeatherCondition.SNOWY -> Color(0xFF2A3545)
-            WeatherCondition.CLOUDY -> Color(0xFF1E2A38)
-            else -> Color(0xFF0D1B2A)
+            WeatherCondition.RAINY, WeatherCondition.DRIZZLE, WeatherCondition.STORMY -> Color(0xFF1E3040)
+            WeatherCondition.SNOWY -> Color(0xFF2A3D50)
+            WeatherCondition.CLOUDY -> Color(0xFF2A3A48)
+            else -> Color(0xFF1A3050)
         }, tween(600), label = "b",
     )
 

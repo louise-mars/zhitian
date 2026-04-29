@@ -11,20 +11,20 @@ object WeatherColors {
 
     data class GradientPair(val start: Color, val end: Color)
 
-    // 晴天 — 鲜亮蓝
-    private val Sunny = GradientPair(Color(0xFF4FACFE), Color(0xFF00F2FE))
-    // 多云 — 柔灰蓝
-    private val Cloudy = GradientPair(Color(0xFF89A0B0), Color(0xFF546E7A))
-    // 雨天 — 深青
-    private val Rainy = GradientPair(Color(0xFF5F9EA0), Color(0xFF2F4F4F))
-    // 雪天 — 冰蓝白
-    private val Snowy = GradientPair(Color(0xFFE8F0FE), Color(0xFFB8D4E8))
-    // 夜间 — 深蓝紫
+    // 晴天 — 柔和天蓝（降低饱和度，不刺眼）
+    private val Sunny = GradientPair(Color(0xFF5B9BD5), Color(0xFF2E86C1))
+    // 多云 — 提亮灰蓝（保证白色文字可读）
+    private val Cloudy = GradientPair(Color(0xFF7B9AAF), Color(0xFF4A6B7A))
+    // 雨天 — 柔和青灰
+    private val Rainy = GradientPair(Color(0xFF5A8A8C), Color(0xFF2C4A4C))
+    // 雪天 — 冰蓝（稍暗，避免太白）
+    private val Snowy = GradientPair(Color(0xFFD0E0F0), Color(0xFF9AB8D0))
+    // 夜间 — 深蓝
     private val Night = GradientPair(Color(0xFF1A237E), Color(0xFF0D47A1))
-    // 雷暴 — 暗灰
-    private val Storm = GradientPair(Color(0xFF424242), Color(0xFF212121))
-    // 雾 — 柔灰
-    private val Foggy = GradientPair(Color(0xFFCFD8DC), Color(0xFF90A4AE))
+    // 雷暴 — 深灰
+    private val Storm = GradientPair(Color(0xFF3E4E5A), Color(0xFF1E2E3A))
+    // 雾 — 中灰（不太亮也不太暗）
+    private val Foggy = GradientPair(Color(0xFFA0B0BC), Color(0xFF6E8898))
 
     fun gradientFor(condition: WeatherCondition, isDay: Boolean = true): GradientPair {
         if (!isDay) return Night
@@ -39,11 +39,11 @@ object WeatherColors {
         }
     }
 
-    /** 雪天背景偏白，需要深色文字；其余用白色 */
+    /** 雪天/雾天背景偏亮，需要深色文字；其余用白色 */
     fun textColorOn(condition: WeatherCondition, isDay: Boolean = true): Color {
         if (!isDay) return Color.White
         return when (condition) {
-            WeatherCondition.SNOWY -> Color(0xFF1A237E)
+            WeatherCondition.SNOWY -> Color(0xFF1A3050)
             else -> Color.White
         }
     }
@@ -53,15 +53,15 @@ object WeatherColors {
         if (!isDay) return GradientPair(Color(0xFF141E30), Color(0xFF243B55))
         return when (condition) {
             WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY ->
-                GradientPair(Color(0xFF4FACFE), Color(0xFF00C6FB))
+                GradientPair(Color(0xFF5B9BD5), Color(0xFF3A7BBF))
             WeatherCondition.CLOUDY ->
-                GradientPair(Color(0xFFBDC3C7), Color(0xFF2C3E50))
+                GradientPair(Color(0xFF8AA0B0), Color(0xFF4A6070))
             WeatherCondition.FOGGY ->
-                GradientPair(Color(0xFFB8C6D0), Color(0xFF6E8898))
+                GradientPair(Color(0xFF95A8B5), Color(0xFF5A7585))
             WeatherCondition.DRIZZLE, WeatherCondition.RAINY ->
-                GradientPair(Color(0xFF5F9EA0), Color(0xFF2F4F4F))
+                GradientPair(Color(0xFF5A8A8C), Color(0xFF2C4A4C))
             WeatherCondition.SNOWY ->
-                GradientPair(Color(0xFFD4E4F1), Color(0xFF8EAFC2))
+                GradientPair(Color(0xFFC0D4E4), Color(0xFF7A9AB0))
             WeatherCondition.STORMY ->
                 GradientPair(Color(0xFF3D4E5C), Color(0xFF1A252F))
         }
