@@ -98,10 +98,10 @@ private fun buildSmartAdvice(
         return Advice("🌡️", "今天温差${tempDiff}°（$tempMin°~$tempMax°），早晚注意添衣")
     }
 
-    // 6. 穿衣建议
+    // 6. 穿衣建议 + 额外信息
     val dressing = when {
-        temp >= 30 -> Advice("👕", "今天$temp°，穿短袖就好，适合外出")
-        temp >= 25 -> Advice("👔", "今天$temp°，薄衫即可，天气不错")
+        temp >= 30 -> Advice("👕", "今天$temp°，穿短袖就好，适合户外活动")
+        temp >= 25 -> Advice("👔", "今天$temp°，薄衫即可，适合散步")
         temp >= 20 -> Advice("🧥", "今天$temp°，建议穿长袖，舒适宜人")
         temp >= 15 -> Advice("🧥", "今天$temp°，建议穿外套")
         temp >= 10 -> Advice("🧣", "今天$temp°，穿夹克或薄棉衣")

@@ -181,9 +181,9 @@ fun CalendarScreen(
             }
         }
 
-        // 右下角浮动添加按钮
+        // 右下角浮动添加按钮（提高位置避免和底部卡片重叠）
         Box(
-            modifier = Modifier.fillMaxSize().padding(20.dp).statusBarsPadding(),
+            modifier = Modifier.fillMaxSize().padding(end = 20.dp, bottom = 140.dp).statusBarsPadding(),
             contentAlignment = Alignment.BottomEnd,
         ) {
             Box(

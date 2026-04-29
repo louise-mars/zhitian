@@ -102,8 +102,8 @@ fun HomeScreen(
     LaunchedEffect(pagerState.currentPage) { fusionExpandedIndex = pagerState.currentPage }
 
     // 折叠状态
-    var showForecastDetail by remember { mutableStateOf(false) }
-    var showMoreInfo by remember { mutableStateOf(false) }
+    var showForecastDetail by remember { mutableStateOf(true) }
+    var showMoreInfo by remember { mutableStateOf(true) }
 
     PullToRefreshBox(isRefreshing = isLoading, onRefresh = onRefresh) {
         Box(
