@@ -67,19 +67,19 @@ private fun SunLightEffect(modifier: Modifier = Modifier) {
 
     // 主光晕呼吸
     val glowAlpha by transition.animateFloat(
-        initialValue = 0.08f,
-        targetValue = 0.25f,
+        initialValue = 0.25f,
+        targetValue = 0.5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
+            animation = tween(3500, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "mainGlow",
     )
     val glowRadius by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.55f,
+        initialValue = 0.45f,
+        targetValue = 0.7f,
         animationSpec = infiniteRepeatable(
-            animation = tween(5000, easing = LinearEasing),
+            animation = tween(4500, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "mainRadius",
@@ -87,10 +87,10 @@ private fun SunLightEffect(modifier: Modifier = Modifier) {
 
     // 次光晕（偏移，更柔和）
     val secondAlpha by transition.animateFloat(
-        initialValue = 0.03f,
-        targetValue = 0.12f,
+        initialValue = 0.1f,
+        targetValue = 0.3f,
         animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = LinearEasing),
+            animation = tween(5500, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "secondGlow",
@@ -143,18 +143,18 @@ private fun SunLightEffect(modifier: Modifier = Modifier) {
             center = Offset(cx, cy + h * 0.05f),
         )
 
-        // 旋转光线（6 条）
-        val rayCount = 6
-        val rayLength = w * 0.4f
+        // 旋转光线（8 条，更粗更亮）
+        val rayCount = 8
+        val rayLength = w * 0.5f
         for (i in 0 until rayCount) {
             val angle = Math.toRadians((rayAngle + i * 360.0 / rayCount).toDouble())
             val endX = cx + (rayLength * kotlin.math.cos(angle)).toFloat()
             val endY = cy + (rayLength * kotlin.math.sin(angle)).toFloat()
             drawLine(
-                color = Color.White.copy(alpha = glowAlpha * 0.15f),
+                color = Color(0xFFFFD54F).copy(alpha = glowAlpha * 0.5f),
                 start = Offset(cx, cy),
                 end = Offset(endX, endY),
-                strokeWidth = 2f,
+                strokeWidth = 4f,
                 cap = StrokeCap.Round,
             )
         }
@@ -182,16 +182,16 @@ private fun CloudEffect(modifier: Modifier = Modifier) {
     // 3 层云，速度不同产生视差
     val clouds = remember {
         listOf(
-            // 远景层（慢、大、淡）
-            CloudLayer(x = -0.1f, y = 0.04f, speed = 0.00015f, width = 0.45f, height = 0.05f, alpha = 0.06f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.5f, y = 0.08f, speed = 0.00012f, width = 0.55f, height = 0.06f, alpha = 0.05f, cornerRatio = 0.5f),
-            // 中景层（中速、中等）
-            CloudLayer(x = 0.1f, y = 0.15f, speed = 0.00030f, width = 0.35f, height = 0.045f, alpha = 0.10f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.7f, y = 0.20f, speed = 0.00025f, width = 0.30f, height = 0.04f, alpha = 0.08f, cornerRatio = 0.5f),
-            // 近景层（快、小、浓）
-            CloudLayer(x = -0.2f, y = 0.28f, speed = 0.00050f, width = 0.25f, height = 0.035f, alpha = 0.15f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.4f, y = 0.33f, speed = 0.00045f, width = 0.20f, height = 0.03f, alpha = 0.12f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.9f, y = 0.12f, speed = 0.00040f, width = 0.28f, height = 0.038f, alpha = 0.10f, cornerRatio = 0.5f),
+            // 远景层
+            CloudLayer(x = -0.1f, y = 0.04f, speed = 0.00018f, width = 0.50f, height = 0.07f, alpha = 0.25f, cornerRatio = 0.5f),
+            CloudLayer(x = 0.5f, y = 0.08f, speed = 0.00015f, width = 0.60f, height = 0.08f, alpha = 0.20f, cornerRatio = 0.5f),
+            // 中景层
+            CloudLayer(x = 0.1f, y = 0.16f, speed = 0.00035f, width = 0.40f, height = 0.06f, alpha = 0.35f, cornerRatio = 0.5f),
+            CloudLayer(x = 0.7f, y = 0.22f, speed = 0.00030f, width = 0.35f, height = 0.055f, alpha = 0.30f, cornerRatio = 0.5f),
+            // 近景层
+            CloudLayer(x = -0.2f, y = 0.30f, speed = 0.00055f, width = 0.30f, height = 0.05f, alpha = 0.40f, cornerRatio = 0.5f),
+            CloudLayer(x = 0.4f, y = 0.35f, speed = 0.00050f, width = 0.25f, height = 0.045f, alpha = 0.35f, cornerRatio = 0.5f),
+            CloudLayer(x = 0.9f, y = 0.13f, speed = 0.00045f, width = 0.32f, height = 0.05f, alpha = 0.28f, cornerRatio = 0.5f),
         ).toMutableList()
     }
 
@@ -281,11 +281,11 @@ private fun RainEffect(modifier: Modifier = Modifier, intensity: Int = 100) {
 private fun createRainDrop() = RainDrop(
     x = Random.nextFloat(),
     y = Random.nextFloat() * 1.2f - 0.1f,
-    speed = Random.nextFloat() * 0.014f + 0.008f,
-    length = Random.nextFloat() * 0.04f + 0.015f,
-    alpha = Random.nextFloat() * 0.25f + 0.08f,
+    speed = Random.nextFloat() * 0.018f + 0.012f,
+    length = Random.nextFloat() * 0.06f + 0.025f,
+    alpha = Random.nextFloat() * 0.4f + 0.3f,
     angle = Random.nextFloat() * 0.12f + 0.04f,
-    strokeWidth = Random.nextFloat() * 1.2f + 0.8f,
+    strokeWidth = Random.nextFloat() * 1.5f + 1.2f,
 )
 
 // ═════════════════════════════════════════════
@@ -308,14 +308,14 @@ private fun SnowEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
     val flakes = remember {
-        List(70) {
+        List(100) {
             Snowflake(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
-                speed = Random.nextFloat() * 0.003f + 0.0008f,
-                radius = Random.nextFloat() * 3.5f + 1f,
-                alpha = Random.nextFloat() * 0.5f + 0.15f,
-                swayAmplitude = Random.nextFloat() * 0.015f + 0.003f,
+                speed = Random.nextFloat() * 0.004f + 0.001f,
+                radius = Random.nextFloat() * 5f + 2f,
+                alpha = Random.nextFloat() * 0.5f + 0.4f,
+                swayAmplitude = Random.nextFloat() * 0.02f + 0.005f,
                 swayFrequency = Random.nextFloat() * 0.04f + 0.015f,
                 phase = Random.nextFloat() * 2f * PI.toFloat(),
             )
@@ -403,14 +403,14 @@ private fun FogEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
     val bands = remember {
-        List(6) {
+        List(10) {
             FogBand(
                 x = Random.nextFloat() * 1.5f - 0.5f,
                 y = Random.nextFloat() * 0.7f + 0.15f,
-                speed = Random.nextFloat() * 0.00025f + 0.00008f,
-                width = Random.nextFloat() * 0.5f + 0.35f,
-                height = Random.nextFloat() * 0.07f + 0.03f,
-                alpha = Random.nextFloat() * 0.08f + 0.02f,
+                speed = Random.nextFloat() * 0.0003f + 0.0001f,
+                width = Random.nextFloat() * 0.7f + 0.5f,
+                height = Random.nextFloat() * 0.12f + 0.05f,
+                alpha = Random.nextFloat() * 0.15f + 0.1f,
             )
         }.toMutableList()
     }

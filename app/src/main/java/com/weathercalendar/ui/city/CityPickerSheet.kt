@@ -51,6 +51,7 @@ import com.weathercalendar.ui.theme.WeatherCalendarTheme
 @Composable
 fun CityPickerSheet(
     cities: List<City>,
+    currentCityName: String = "",
     searchResults: List<GeocodingResult> = emptyList(),
     isSearching: Boolean = false,
     onSearch: (String) -> Unit = {},
@@ -106,54 +107,65 @@ fun CityPickerSheet(
 
             Spacer(Modifier.height(16.dp))
 
-            // 搜索结果
-            if (searchQuery.isNotBlank() && searchResults.isNotEmpty()) {
-                SectionLabel("搜索结果")
-                Spacer(Modifier.height(8.dp))
-                searchResults.take(5).forEach { result ->
-                    SearchResultRow(
-                        result = result,
-                        onSelect = {
-                            onCitySelected(
-                                City(
-                                    name = result.name,
-                                    latitude = result.latitude,
-                                    longitude = result.longitude,
+            // 可滚动的城市列表
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                // 搜索结果
+                if (searchQuery.isNotBlank() && searchResults.isNotEmpty()) {
+                    item { SectionLabel("搜索结果") }
+                    item { Spacer(Modifier.height(8.dp)) }
+                    items(searchResults.take(5)) { result ->
+                        SearchResultRow(
+                            result = result,
+                            onSelect = {
+                                onCitySelected(
+                                    City(
+                                        name = result.name,
+                                        latitude = result.latitude,
+                                        longitude = result.longitude,
+                                    )
                                 )
-                            )
-                        },
-                        onAdd = { onAddCity(result) },
-                    )
+                            },
+                            onAdd = { onAddCity(result) },
+                        )
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-            }
 
-            // 当前定位
-            val currentCity = cities.find { it.isCurrentLocation }
-            if (currentCity != null) {
-                SectionLabel("📍 当前定位")
-                Spacer(Modifier.height(8.dp))
-                CityRow(
-                    city = currentCity,
-                    onClick = { onCitySelected(currentCity) },
-                )
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
-            }
+                // 当前定位
+                val currentCity = cities.find { it.isCurrentLocation }
+                if (currentCity != null) {
+                    item {
+                        SectionLabel("📍 当前定位")
+                        Spacer(Modifier.height(8.dp))
+                        CityRow(
+                            city = currentCity,
+                            isSelected = currentCity.name == currentCityName,
+                            onClick = { onCitySelected(currentCity) },
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
 
-            // 收藏城市
-            val savedCities = cities.filter { !it.isCurrentLocation }
-            if (savedCities.isNotEmpty()) {
-                SectionLabel("★ 收藏城市")
-                Spacer(Modifier.height(8.dp))
-                savedCities.forEach { city ->
-                    CityRow(
-                        city = city,
-                        onClick = { onCitySelected(city) },
-                    )
+                // 收藏城市
+                val savedCities = cities.filter { !it.isCurrentLocation }
+                if (savedCities.isNotEmpty()) {
+                    item {
+                        SectionLabel("★ 收藏城市")
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    items(savedCities) { city ->
+                        CityRow(
+                            city = city,
+                            isSelected = city.name == currentCityName,
+                            onClick = { onCitySelected(city) },
+                        )
+                    }
                 }
             }
         }
@@ -172,6 +184,7 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun CityRow(
     city: City,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -185,14 +198,17 @@ private fun CityRow(
             imageVector = if (city.isCurrentLocation) Icons.Default.LocationOn
             else Icons.Default.Star,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = city.name,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
         if (city.temperature != null && city.condition != null) {
@@ -206,6 +222,10 @@ private fun CityRow(
                 text = city.condition.icon,
                 fontSize = 18.sp,
             )
+        }
+        if (isSelected) {
+            Spacer(Modifier.width(6.dp))
+            Text("✓", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
         }
     }
 }

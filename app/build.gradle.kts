@@ -7,6 +7,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// API Key 从 local.properties 读取，不提交到 Git
+val qweatherKey: String by lazy {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.readLines().find { it.startsWith("QWEATHER_API_KEY=") }
+            ?.substringAfter("=")?.trim() ?: ""
+    } else ""
+}
+
 android {
     namespace = "com.weathercalendar"
     compileSdk = 35
@@ -18,7 +27,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "QWEATHER_API_KEY", "\"REDACTED\"")
+        buildConfigField("String", "QWEATHER_API_KEY", "\"$qweatherKey\"")
     }
 
     buildTypes {
@@ -84,7 +93,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Location
-    implementation(libs.play.services.location)
+    implementation("com.amap.api:location:latest.integration")
 
     // Glance Widget
     implementation(libs.glance.appwidget)

@@ -72,3 +72,11 @@
 
 # ── QWeather API models ──
 -keep class com.weathercalendar.data.remote.QWeather* { *; }
+
+# ── 高德定位 SDK ──
+-keep class com.amap.api.** { *; }
+-keep class com.loc.** { *; }
+-keep class com.autonavi.** { *; }
+-dontwarn com.amap.api.**
+-dontwarn com.loc.**
+-dontwarn com.autonavi.**

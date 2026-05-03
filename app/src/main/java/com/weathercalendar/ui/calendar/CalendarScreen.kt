@@ -120,7 +120,23 @@ fun CalendarScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(animStart, animEnd, animBottom))),
     ) {
+        // 天气动画（雨/雪/云等）
         WeatherAnimationOverlay(condition = selectedCondition, isDay = true)
+
+        // 氛围感光晕（柔和的圆形渐变光斑）
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            animStart.copy(alpha = 0.15f),
+                            Color.Transparent,
+                        ),
+                        radius = 600f,
+                    )
+                ),
+        )
 
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // 顶部导航
@@ -259,11 +275,11 @@ private fun SelectedDateSummary(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     selectedDate.format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINESE)),
-                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White,
                 )
                 if (cell?.lunarText != null) {
                     Spacer(Modifier.width(8.dp))
-                    Text(cell.lunarText, fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(cell.lunarText, fontSize = 13.sp, color = Color.White.copy(alpha = 0.6f))
                 }
             }
 
@@ -316,7 +332,7 @@ private fun CalendarTopBar(
         }
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, "上月", tint = Color.White) }
-        Text(monthLabel, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(monthLabel, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         IconButton(onClick = onNext) { Icon(Icons.Default.ChevronRight, "下月", tint = Color.White) }
         Spacer(Modifier.weight(1f))
         Spacer(Modifier.size(48.dp))
@@ -338,13 +354,13 @@ private fun WeekdayHeader() {
             val color = when (day) {
                 DayOfWeek.SATURDAY -> Color(0xFF4FC3F7)  // 蓝色
                 DayOfWeek.SUNDAY -> Color(0xFFEF5350)    // 红色
-                else -> Color.White.copy(alpha = 0.5f)
+                else -> Color.White.copy(alpha = 0.6f)
             }
             Text(
                 day.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color,
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color,
             )
         }
     }
@@ -421,9 +437,9 @@ private fun DayCellView(
 
     // 背景
     val bg = when {
-        isToday && isSelected -> Color(0xFFEF5350)  // 万年历风格：今天红色
-        isToday -> Color(0xFFEF5350)
-        isSelected -> Color.White.copy(alpha = 0.15f)
+        isToday && isSelected -> Color(0xFFEF5350)
+        isToday -> Color(0xFFEF5350).copy(alpha = 0.85f)
+        isSelected -> Color.White.copy(alpha = 0.18f)
         else -> Color.Transparent
     }
 
@@ -452,26 +468,26 @@ private fun DayCellView(
     Column(
         modifier = modifier
             .scale(scale)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 公历数字
         Text(
             "${cell.date.dayOfMonth}",
-            fontSize = 18.sp,
-            fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 20.sp,
+            fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium,
             color = numColor,
         )
-        // 农历/节日（小字）
+        // 农历/节日
         Text(
             subText,
-            fontSize = 11.sp,
+            fontSize = 13.sp,
             color = subColor,
             maxLines = 1,
-            fontWeight = if (hasHoliday || hasLunarFestival) FontWeight.Medium else FontWeight.Normal,
+            fontWeight = if (hasHoliday || hasLunarFestival) FontWeight.SemiBold else FontWeight.Normal,
         )
         // 事件圆点 + 天气小图标
         Row(
@@ -479,11 +495,11 @@ private fun DayCellView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (cell.hasEvents) {
-                Box(Modifier.size(4.dp).clip(CircleShape).background(Color(0xFF4FC3F7)))
+                Box(Modifier.size(5.dp).clip(CircleShape).background(Color(0xFF4FC3F7)))
                 Spacer(Modifier.width(2.dp))
             }
             if (cell.weatherIcon != null) {
-                Text(cell.weatherIcon, fontSize = 11.sp)
+                Text(cell.weatherIcon, fontSize = 12.sp)
             }
         }
     }

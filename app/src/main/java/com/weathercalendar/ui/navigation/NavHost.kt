@@ -3,6 +3,7 @@ package com.weathercalendar.ui.navigation
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +61,6 @@ fun WeatherCalendarNavHost() {
                 navController.navigate(Routes.HOME) {
                     popUpTo(Routes.PERMISSION) { inclusive = true }
                 }
-                homeViewModel.loadData()
             }
             PermissionScreen(
                 onAllGranted = navigateToHome,
@@ -71,6 +71,11 @@ fun WeatherCalendarNavHost() {
         // ── 首页 ──
         composable(Routes.HOME) {
             val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+
+            // 首次进入 HOME 时加载数据（确保权限已授予）
+            LaunchedEffect(Unit) {
+                homeViewModel.loadData()
+            }
 
             HomeScreen(
                 cityName = uiState.cityName,
@@ -99,7 +104,7 @@ fun WeatherCalendarNavHost() {
                         lunarText = uiState.lunarText,
                     )
                 },
-                onRefresh = { homeViewModel.loadData() },
+                onRefresh = { homeViewModel.loadData(forceRefresh = true) },
             )
         }
 
@@ -126,7 +131,11 @@ fun WeatherCalendarNavHost() {
         // ── 设置页 ──
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.popBackStack()
+                    // 设置变更后刷新首页（温度单位等）
+                    homeViewModel.loadData(forceRefresh = true)
+                },
             )
         }
     }
@@ -143,17 +152,23 @@ fun WeatherCalendarNavHost() {
 
         CityPickerSheet(
             cities = allCities,
+            currentCityName = homeViewModel.uiState.value.cityName,
             searchResults = cityState.searchResults,
             isSearching = cityState.isSearching,
             onSearch = { cityViewModel.search(it) },
             onCitySelected = { city ->
-                homeViewModel.selectCity(
-                    SavedCity(
-                        name = city.name,
-                        latitude = city.latitude,
-                        longitude = city.longitude,
+                if (city.isCurrentLocation) {
+                    // 选择"当前定位"时，重新 GPS 定位
+                    homeViewModel.useCurrentLocation()
+                } else {
+                    homeViewModel.selectCity(
+                        SavedCity(
+                            name = city.name,
+                            latitude = city.latitude,
+                            longitude = city.longitude,
+                        )
                     )
-                )
+                }
                 showCityPicker = false
             },
             onAddCity = { cityViewModel.addCity(it) },

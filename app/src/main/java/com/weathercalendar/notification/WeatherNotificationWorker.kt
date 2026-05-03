@@ -65,23 +65,25 @@ class WeatherNotificationWorker(
                 .addMigrations(AppDatabase.MIGRATION_1_2)
                 .build()
 
-            val cacheKey = WeatherEntity.key(cityLat, cityLon)
-            val cached = db.weatherDao().get(cacheKey)
+            try {
+                val cacheKey = WeatherEntity.key(cityLat, cityLon)
+                val cached = db.weatherDao().get(cacheKey)
 
-            // 读取明天的 App 内事件
-            val tomorrow = LocalDate.now().plusDays(1)
-            val tomorrowEvents = try {
-                db.eventDao().getByDate(tomorrow.toString())
-            } catch (_: Exception) {
-                emptyList()
+                // 读取明天的 App 内事件
+                val tomorrow = LocalDate.now().plusDays(1)
+                val tomorrowEvents = try {
+                    db.eventDao().getByDate(tomorrow.toString())
+                } catch (_: Exception) {
+                    emptyList()
+                }
+
+                if (cached == null) return Result.success()
+
+                val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)
+                checkAndNotify(response, tomorrowEvents.isNotEmpty())
+            } finally {
+                db.close()
             }
-
-            db.close()
-
-            if (cached == null) return Result.success()
-
-            val response = json.decodeFromString<OpenMeteoResponse>(cached.responseJson)
-            checkAndNotify(response, tomorrowEvents.isNotEmpty())
 
             Result.success()
         } catch (_: Exception) {

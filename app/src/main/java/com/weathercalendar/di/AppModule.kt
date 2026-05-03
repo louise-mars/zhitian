@@ -6,9 +6,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.weathercalendar.data.local.AppDatabase
 import com.weathercalendar.data.local.EventDao
 import com.weathercalendar.data.local.WeatherDao
-import com.weathercalendar.data.remote.AirQualityApi
 import com.weathercalendar.data.remote.GeocodingApi
-import com.weathercalendar.data.remote.NominatimApi
 import com.weathercalendar.data.remote.QWeatherApi
 import com.weathercalendar.data.remote.WeatherApi
 import dagger.Module
@@ -40,8 +38,9 @@ object AppModule {
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
 
         // 只在 debug 版本打印网络日志
         if (com.weathercalendar.BuildConfig.DEBUG) {
@@ -91,40 +90,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("nominatim")
-    fun provideNominatimRetrofit(client: OkHttpClient, json: Json): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(NominatimApi.BASE_URL)
-            .client(client)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideNominatimApi(@Named("nominatim") retrofit: Retrofit): NominatimApi {
-        return retrofit.create(NominatimApi::class.java)
-    }
-
-    @Provides
-    @Singleton
-    @Named("airquality")
-    fun provideAirQualityRetrofit(client: OkHttpClient, json: Json): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(AirQualityApi.BASE_URL)
-            .client(client)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideAirQualityApi(@Named("airquality") retrofit: Retrofit): AirQualityApi {
-        return retrofit.create(AirQualityApi::class.java)
-    }
-
-    @Provides
-    @Singleton
     @Named("qweather")
     fun provideQWeatherRetrofit(client: OkHttpClient, json: Json): Retrofit {
         return Retrofit.Builder()
@@ -151,7 +116,6 @@ object AppModule {
             "weather_calendar.db",
         )
             .addMigrations(AppDatabase.MIGRATION_1_2)
-            .fallbackToDestructiveMigration()
             .build()
     }
 

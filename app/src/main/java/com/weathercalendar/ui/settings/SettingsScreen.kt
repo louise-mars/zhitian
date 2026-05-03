@@ -104,31 +104,6 @@ fun SettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // ── 定位开关 ──
-            SectionTitle("定位")
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("使用 GPS 定位", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "关闭后将使用默认城市",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = uiState.useLocation,
-                    onCheckedChange = { viewModel.setUseLocation(it) },
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
             // ── 天气提醒 ──
             SectionTitle("天气提醒")
             Spacer(Modifier.height(8.dp))
@@ -250,7 +225,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "天气数据来源：Open-Meteo（免费开放 API）",
+                "天气数据来源：和风天气",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

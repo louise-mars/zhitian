@@ -62,11 +62,36 @@ interface QWeatherApi {
         @Query("key") key: String = API_KEY,
     ): QWeatherWarningResponse
 
+    /** 城市搜索 */
+    @GET("v7/geo/city/lookup")
+    suspend fun cityLookup(
+        @Query("location") location: String,  // 城市名
+        @Query("key") key: String = API_KEY,
+        @Query("number") number: Int = 10,
+    ): QWeatherCityResponse
+
     companion object {
-        const val BASE_URL = "https://devapi.qweather.com/"
+        const val BASE_URL = "https://k678m2r6e6.re.qweatherapi.com/"
         val API_KEY: String get() = com.weathercalendar.BuildConfig.QWEATHER_API_KEY
     }
 }
+
+@Serializable
+data class QWeatherCityResponse(
+    val code: String,
+    val location: List<QWeatherCity> = emptyList(),
+)
+
+@Serializable
+data class QWeatherCity(
+    val name: String,
+    val id: String = "",
+    val lat: String,
+    val lon: String,
+    val adm1: String = "",  // 省
+    val adm2: String = "",  // 市
+    val country: String = "",
+)
 
 // ─────────────────────────────────────────────
 // 响应模型

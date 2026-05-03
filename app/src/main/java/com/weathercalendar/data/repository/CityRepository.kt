@@ -7,8 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.weathercalendar.data.model.City
-import com.weathercalendar.data.remote.GeocodingApi
 import com.weathercalendar.data.remote.GeocodingResult
+import com.weathercalendar.data.remote.QWeatherApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -33,7 +33,7 @@ data class SavedCity(
 @Singleton
 class CityRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val geocodingApi: GeocodingApi,
+    private val qWeatherApi: QWeatherApi,
     private val json: Json,
 ) {
     private val dataStore = context.dataStore
@@ -43,11 +43,25 @@ class CityRepository @Inject constructor(
         private val KEY_SELECTED_CITY = stringPreferencesKey("selected_city")
     }
 
-    /** 搜索城市（调用 Open-Meteo Geocoding API） */
+    /** 搜索城市（调用和风天气 GeoAPI） */
     suspend fun searchCities(query: String): Result<List<GeocodingResult>> {
         return try {
-            val response = geocodingApi.searchCity(query)
-            Result.success(response.results ?: emptyList())
+            val response = qWeatherApi.cityLookup(query)
+            if (response.code != "200") {
+                return Result.success(emptyList())
+            }
+            val results = response.location.map { city ->
+                GeocodingResult(
+                    id = city.id.toLongOrNull() ?: 0L,
+                    name = city.name,
+                    latitude = city.lat.toDoubleOrNull() ?: 0.0,
+                    longitude = city.lon.toDoubleOrNull() ?: 0.0,
+                    country = city.country,
+                    countryCode = null,
+                    admin1 = city.adm1.takeIf { it.isNotBlank() && it != city.name },
+                )
+            }
+            Result.success(results)
         } catch (e: Exception) {
             Result.failure(e)
         }

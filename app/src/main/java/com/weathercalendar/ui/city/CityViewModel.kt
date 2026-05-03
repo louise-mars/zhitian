@@ -11,6 +11,8 @@ import com.weathercalendar.data.repository.SavedCity
 import com.weathercalendar.data.repository.WeatherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,25 +65,40 @@ class CityViewModel @Inject constructor(
                 }
             }
 
-            // 加载收藏城市
+            // 加载收藏城市（并行获取天气）
             cityRepository.savedCities.collect { savedList ->
-                val cities = savedList.map { saved ->
-                    // 尝试获取每个城市的当前温度
-                    val weather = try {
-                        weatherRepository.getWeather(saved.latitude, saved.longitude).getOrNull()
-                    } catch (_: Exception) {
-                        null
-                    }
+                // 先立即显示城市列表（无温度）
+                val citiesWithoutWeather = savedList.map { saved ->
                     City(
                         name = saved.name,
                         latitude = saved.latitude,
                         longitude = saved.longitude,
-                        temperature = weather?.current?.temperature,
-                        condition = weather?.current?.condition,
+                        temperature = null,
+                        condition = null,
                         isCurrentLocation = false,
                     )
                 }
-                _uiState.update { it.copy(savedCities = cities) }
+                _uiState.update { it.copy(savedCities = citiesWithoutWeather) }
+
+                // 并行获取每个城市的天气
+                val citiesWithWeather = coroutineScope {
+                    savedList.map { saved ->
+                        async {
+                            val weather = try {
+                                weatherRepository.getWeather(saved.latitude, saved.longitude).getOrNull()
+                            } catch (_: Exception) { null }
+                            City(
+                                name = saved.name,
+                                latitude = saved.latitude,
+                                longitude = saved.longitude,
+                                temperature = weather?.current?.temperature,
+                                condition = weather?.current?.condition,
+                                isCurrentLocation = false,
+                            )
+                        }
+                    }.map { it.await() }
+                }
+                _uiState.update { it.copy(savedCities = citiesWithWeather) }
             }
         }
     }
