@@ -74,6 +74,23 @@ data class WeatherWarning(
     val severityColor: String,
 )
 
+/** 空气质量 */
+data class AirQuality(
+    val aqi: Int,
+    val category: String,   // "优"/"良"/"轻度污染"/...
+    val pm2p5: String,
+    val pm10: String,
+    val color: Long,        // 对应颜色
+)
+
+/** 生活指数 */
+data class LifeIndex(
+    val type: String,       // "1"=运动 "2"=洗车 ...
+    val name: String,       // "运动指数"
+    val category: String,   // "适宜"
+    val text: String,       // 详细描述
+)
+
 // ─────────────────────────────────────────────
 // 日历相关
 // ─────────────────────────────────────────────
@@ -82,8 +99,10 @@ data class WeatherWarning(
 data class CalendarEvent(
     val id: Long,
     val title: String,
-    val date: LocalDate = LocalDate.now(),  // 事件所属日期
-    val time: LocalTime?,                   // null = 全天事件
+    val description: String = "",       // 详细描述/行动
+    val date: LocalDate = LocalDate.now(),
+    val time: LocalTime?,               // null = 全天事件
+    val reminderMinutes: Int? = null,   // 提前提醒分钟数
     val color: Long = 0xFF4CAF50,
 )
 

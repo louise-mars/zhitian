@@ -46,9 +46,9 @@
 
 | Service | Purpose | Privacy Policy |
 |---------|---------|---------------|
-| QWeather (和风天气) | Weather data, forecasts, warnings | https://www.qweather.com/en/privacy |
-| Amap (高德) Location SDK | Device positioning | https://lbs.amap.com/pages/privacy/ |
-| Open-Meteo | Backup weather data & city search | https://open-meteo.com/en/terms |
+| QWeather (和风天气) | Weather data (15-day forecast, hourly, warnings, AQI, life indices), city search | https://www.qweather.com/en/privacy |
+| Amap (高德) Location SDK | Device positioning (GPS + cell tower + WiFi) | https://lbs.amap.com/pages/privacy/ |
+| Open-Meteo | Backup weather data source | https://open-meteo.com/en/terms |
 
 ## Children's Privacy
 

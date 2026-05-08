@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -54,13 +56,16 @@ fun CityPickerSheet(
     currentCityName: String = "",
     searchResults: List<GeocodingResult> = emptyList(),
     isSearching: Boolean = false,
+    searchError: Boolean = false,
     onSearch: (String) -> Unit = {},
     onCitySelected: (City) -> Unit,
     onAddCity: (GeocodingResult) -> Unit = {},
+    onDeleteCity: (City) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var searchQuery by remember { mutableStateOf("") }
+    var cityToDelete by remember { mutableStateOf<City?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -113,7 +118,7 @@ fun CityPickerSheet(
                 if (searchQuery.isNotBlank() && searchResults.isNotEmpty()) {
                     item { SectionLabel("搜索结果") }
                     item { Spacer(Modifier.height(8.dp)) }
-                    items(searchResults.take(5)) { result ->
+                    items(searchResults.take(10)) { result ->
                         SearchResultRow(
                             result = result,
                             onSelect = {
@@ -132,6 +137,18 @@ fun CityPickerSheet(
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
+                    }
+                }
+
+                // 搜索中或无结果提示
+                if (searchQuery.isNotBlank() && searchResults.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (isSearching) "搜索中..." else if (searchError) "网络错误，请检查网络" else "未找到「$searchQuery」相关城市",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
                     }
                 }
 
@@ -159,15 +176,38 @@ fun CityPickerSheet(
                         SectionLabel("★ 收藏城市")
                         Spacer(Modifier.height(8.dp))
                     }
-                    items(savedCities) { city ->
+                    items(savedCities, key = { "${it.name}_${it.latitude}_${it.longitude}" }) { city ->
                         CityRow(
                             city = city,
                             isSelected = city.name == currentCityName,
                             onClick = { onCitySelected(city) },
+                            onDelete = { cityToDelete = city },
                         )
                     }
                 }
             }
+        }
+
+        // 删除确认对话框
+        if (cityToDelete != null) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { cityToDelete = null },
+                title = { Text("删除城市") },
+                text = { Text("确定要删除「${cityToDelete!!.name}」吗？") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        onDeleteCity(cityToDelete!!)
+                        cityToDelete = null
+                    }) {
+                        Text("删除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { cityToDelete = null }) {
+                        Text("取消")
+                    }
+                },
+            )
         }
     }
 }
@@ -186,6 +226,7 @@ private fun CityRow(
     city: City,
     isSelected: Boolean = false,
     onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -226,6 +267,15 @@ private fun CityRow(
         if (isSelected) {
             Spacer(Modifier.width(6.dp))
             Text("✓", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+        }
+        if (onDelete != null) {
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "删除",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp).clickable { onDelete() },
+            )
         }
     }
 }

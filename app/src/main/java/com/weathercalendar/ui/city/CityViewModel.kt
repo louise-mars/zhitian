@@ -26,6 +26,7 @@ data class CityPickerUiState(
     val savedCities: List<City> = emptyList(),
     val searchResults: List<GeocodingResult> = emptyList(),
     val isSearching: Boolean = false,
+    val searchError: Boolean = false,
 )
 
 @HiltViewModel
@@ -107,14 +108,18 @@ class CityViewModel @Inject constructor(
     fun search(query: String) {
         searchJob?.cancel()
         if (query.isBlank()) {
-            _uiState.update { it.copy(searchResults = emptyList(), isSearching = false) }
+            _uiState.update { it.copy(searchResults = emptyList(), isSearching = false, searchError = false) }
             return
         }
         searchJob = viewModelScope.launch {
             delay(300) // 防抖
-            _uiState.update { it.copy(isSearching = true) }
-            val results = cityRepository.searchCities(query).getOrDefault(emptyList())
-            _uiState.update { it.copy(searchResults = results, isSearching = false) }
+            _uiState.update { it.copy(isSearching = true, searchError = false) }
+            val result = cityRepository.searchCities(query)
+            if (result.isSuccess) {
+                _uiState.update { it.copy(searchResults = result.getOrDefault(emptyList()), isSearching = false) }
+            } else {
+                _uiState.update { it.copy(searchResults = emptyList(), isSearching = false, searchError = true) }
+            }
         }
     }
 

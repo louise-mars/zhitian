@@ -1,8 +1,10 @@
 package com.weathercalendar.data.repository
 
+import com.weathercalendar.data.model.AirQuality
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DailyWeather
 import com.weathercalendar.data.model.HourlyForecast
+import com.weathercalendar.data.model.LifeIndex
 import com.weathercalendar.data.model.RainForecast
 import com.weathercalendar.data.model.WeatherDetails
 import com.weathercalendar.data.remote.QWeatherApi
@@ -24,24 +26,51 @@ import javax.inject.Singleton
 class QWeatherRepository @Inject constructor(
     private val api: QWeatherApi,
 ) {
-    /**
-     * 获取完整天气数据（实况 + 小时 + 7 天 + 降雨 + 空气质量 + 生活指数）。
-     * @param location "经度,纬度" 格式
-     */
     suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
-        val location = "%.2f,%.2f".format(longitude, latitude) // 和风用 "经度,纬度"
+        val location = "%.2f,%.2f".format(longitude, latitude)
 
         return try {
-            // 并行请求所有数据
             coroutineScope {
                 val nowDeferred = async { api.weatherNow(location) }
-                val dailyDeferred = async { api.weather7d(location) }
+                val dailyDeferred = async {
+                    // 优先 15 天预报，失败 fallback 到 7 天
+                    try {
+                        val resp = api.weather15d(location)
+                        if (resp.code == "200") resp else api.weather7d(location)
+                    } catch (_: Exception) {
+                        api.weather7d(location)
+                    }
+                }
                 val hourlyDeferred = async { api.weather24h(location) }
                 val aqiDeferred = async {
                     try {
                         val airResp = api.airNow(location)
-                        if (airResp.code == "200") airResp.now?.category ?: "—" else "—"
-                    } catch (_: Exception) { "—" }
+                        if (airResp.code == "200" && airResp.now != null) {
+                            val aqi = airResp.now!!.aqi.toIntOrNull() ?: 0
+                            AirQuality(
+                                aqi = aqi,
+                                category = airResp.now!!.category,
+                                pm2p5 = airResp.now!!.pm2p5,
+                                pm10 = airResp.now!!.pm10,
+                                color = aqiColor(aqi),
+                            )
+                        } else null
+                    } catch (_: Exception) { null }
+                }
+                val indicesDeferred = async {
+                    try {
+                        val resp = api.indices(location)
+                        if (resp.code == "200") {
+                            resp.daily.map { idx ->
+                                LifeIndex(
+                                    type = idx.type,
+                                    name = idx.name,
+                                    category = idx.category,
+                                    text = idx.text,
+                                )
+                            }
+                        } else emptyList()
+                    } catch (_: Exception) { emptyList<LifeIndex>() }
                 }
                 val rainDeferred = async {
                     try {
@@ -62,21 +91,20 @@ class QWeatherRepository @Inject constructor(
                         if (warnResp.code == "200") {
                             warnResp.warning.map { w ->
                                 com.weathercalendar.data.model.WeatherWarning(
-                                    title = w.title,
-                                    text = w.text,
-                                    typeName = w.typeName,
-                                    level = w.level,
+                                    title = w.title, text = w.text,
+                                    typeName = w.typeName, level = w.level,
                                     severityColor = w.severityColor,
                                 )
                             }
-                        } else emptyList<com.weathercalendar.data.model.WeatherWarning>()
+                        } else emptyList()
                     } catch (_: Exception) { emptyList<com.weathercalendar.data.model.WeatherWarning>() }
                 }
 
                 val nowResp = nowDeferred.await()
                 val dailyResp = dailyDeferred.await()
                 val hourlyResp = hourlyDeferred.await()
-                val aqiLabel = aqiDeferred.await()
+                val airQuality = aqiDeferred.await()
+                val lifeIndices = indicesDeferred.await()
                 val rainForecast = rainDeferred.await()
                 val warnings = warningDeferred.await()
 
@@ -91,17 +119,14 @@ class QWeatherRepository @Inject constructor(
                     temperature = now.temp.toIntOrNull() ?: 0,
                     feelsLike = now.feelsLike.toIntOrNull() ?: 0,
                     condition = condition,
-                    isDay = true,
+                    isDay = isCurrentlyDay(dailyResp.daily.firstOrNull()?.sunrise, dailyResp.daily.firstOrNull()?.sunset),
                 )
 
-                // 小时预报
                 val nowHour = LocalTime.now().hour
                 val hourlyForecasts = hourlyResp.hourly.mapNotNull { h ->
                     val time = try {
                         LocalDateTime.parse(h.fxTime, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                    } catch (_: Exception) {
-                        return@mapNotNull null
-                    }
+                    } catch (_: Exception) { return@mapNotNull null }
                     HourlyForecast(
                         time = time.toLocalTime(),
                         temperature = h.temp.toIntOrNull() ?: 0,
@@ -110,7 +135,6 @@ class QWeatherRepository @Inject constructor(
                     )
                 }
 
-                // 7 天预报
                 val dailyForecasts = dailyResp.daily.map { d ->
                     DailyWeather(
                         date = LocalDate.parse(d.fxDate),
@@ -120,18 +144,14 @@ class QWeatherRepository @Inject constructor(
                     )
                 }
 
-                // 日出日落
                 val todayDaily = dailyResp.daily.firstOrNull()
-                val sunrise = todayDaily?.sunrise ?: ""
-                val sunset = todayDaily?.sunset ?: ""
-
                 val details = WeatherDetails(
                     humidity = now.humidity.toIntOrNull() ?: 0,
                     windSpeed = now.windSpeed.toIntOrNull() ?: 0,
                     uvIndex = formatUvIndex(todayDaily?.uvIndex?.toDoubleOrNull() ?: 0.0),
-                    airQuality = aqiLabel,
-                    sunrise = sunrise,
-                    sunset = sunset,
+                    airQuality = airQuality?.category ?: "—",
+                    sunrise = todayDaily?.sunrise ?: "",
+                    sunset = todayDaily?.sunset ?: "",
                 )
 
                 Result.success(
@@ -142,6 +162,8 @@ class QWeatherRepository @Inject constructor(
                         details = details,
                         rainForecast = rainForecast,
                         warnings = warnings,
+                        airQuality = airQuality,
+                        lifeIndices = lifeIndices,
                         fromCache = false,
                     )
                 )
@@ -149,6 +171,23 @@ class QWeatherRepository @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun isCurrentlyDay(sunrise: String?, sunset: String?): Boolean {
+        if (sunrise.isNullOrBlank() || sunset.isNullOrBlank()) return true
+        val now = LocalTime.now()
+        val sunriseTime = try { LocalTime.parse(sunrise) } catch (_: Exception) { return true }
+        val sunsetTime = try { LocalTime.parse(sunset) } catch (_: Exception) { return true }
+        return now.isAfter(sunriseTime) && now.isBefore(sunsetTime)
+    }
+
+    private fun aqiColor(aqi: Int): Long = when {
+        aqi <= 50 -> 0xFF4CAF50   // 优 - 绿
+        aqi <= 100 -> 0xFFFFEB3B  // 良 - 黄
+        aqi <= 150 -> 0xFFFF9800  // 轻度 - 橙
+        aqi <= 200 -> 0xFFF44336  // 中度 - 红
+        aqi <= 300 -> 0xFF9C27B0  // 重度 - 紫
+        else -> 0xFF795548        // 严重 - 褐
     }
 
     private fun formatUvIndex(uv: Double): String = when {

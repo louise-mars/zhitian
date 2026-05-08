@@ -47,8 +47,10 @@ class CalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
 
-    // 缓存已加载的月份数据，避免重复网络请求
+    // 缓存已加载的月份数据，最多保留 6 个月避免内存增长
     private val monthCache = ConcurrentHashMap<YearMonth, MonthData>()
+    private val cacheOrder = mutableListOf<YearMonth>()
+    private val maxCacheSize = 6
 
     // 缓存坐标，避免每次切月都重新定位
     private var cachedLat: Double? = null
@@ -173,8 +175,14 @@ class CalendarViewModel @Inject constructor(
                 }
             }
 
-            // 缓存结果
+            // 缓存结果（LRU 限制）
             monthCache[month] = MonthData(updatedDays, eventsMap, weatherMap)
+            cacheOrder.remove(month)
+            cacheOrder.add(month)
+            while (cacheOrder.size > maxCacheSize) {
+                val oldest = cacheOrder.removeFirst()
+                monthCache.remove(oldest)
+            }
         }
     }
 
@@ -203,17 +211,17 @@ class CalendarViewModel @Inject constructor(
 
     // ── 事件 CRUD ──
 
-    fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null) {
+    fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50) {
         viewModelScope.launch {
-            eventRepository.addEvent(title = title, date = date, time = time)
+            eventRepository.addEvent(title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, color = color)
             monthCache.clear()
             loadMonth(_uiState.value.currentMonth)
         }
     }
 
-    fun updateEvent(id: Long, title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null) {
+    fun updateEvent(id: Long, title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50) {
         viewModelScope.launch {
-            eventRepository.updateEvent(id = id, title = title, date = date, time = time)
+            eventRepository.updateEvent(id = id, title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, color = color)
             monthCache.clear()
             loadMonth(_uiState.value.currentMonth)
         }

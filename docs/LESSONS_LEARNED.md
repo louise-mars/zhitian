@@ -143,3 +143,173 @@ composable(Routes.HOME) {
     // ...
 }
 ```
+
+
+---
+
+## 6. 和风天气 Geo API 路径
+
+### 问题
+
+城市搜索功能不工作——API 返回 404。
+
+### 根因
+
+和风天气的 Geo API 路径不是 `/v7/geo/city/lookup`，而是 `/geo/v2/city/lookup`。新版项目专属域名下，天气 API 和 Geo API 的路径前缀不同。
+
+### 解决方案
+
+```kotlin
+@GET("geo/v2/city/lookup")  // 不是 v7/geo/city/lookup
+suspend fun cityLookup(...)
+```
+
+### 教训
+
+和风天气的 API 文档可能不完全准确，最好直接在浏览器中测试 URL 确认路径格式。
+
+---
+
+## 7. BottomSheet 中的手势冲突
+
+### 问题
+
+在 `ModalBottomSheet` 内部使用 `SwipeToDismissBox`（左滑删除），滑动手势被 BottomSheet 的拖拽手势拦截，导致删除功能无法触发。
+
+### 解决方案
+
+放弃滑动删除，改为行内删除按钮（🗑️ 图标）。在 BottomSheet 等有手势冲突的容器中，避免使用需要水平滑动的交互模式。
+
+---
+
+## 8. 温度折线图可见性
+
+### 问题
+
+温度折线图在蓝色天气背景上几乎不可见——低温线用了浅蓝色（`#4FC3F7`），和背景色几乎相同。
+
+### 解决方案
+
+- 高温线：金黄色（`#FFD54F`）
+- 低温线：淡紫色（`#CE93D8`）
+- 线条加粗到 4f，数据点加大到 5f
+
+### 教训
+
+选择图表颜色时必须考虑实际背景色。天气 app 的背景是动态渐变的，图表颜色需要在所有天气条件下都有足够对比度。
+
+---
+
+## 9. Room 数据库多实例风险
+
+### 问题
+
+`WeatherWidgetDataProvider` 和 `WeatherNotificationWorker` 各自创建独立的 Room 数据库实例，且 migration 配置不一致。Widget 使用了 `fallbackToDestructiveMigration()`，可能在 DB 版本升级时删除所有用户数据。
+
+### 解决方案
+
+所有数据库实例必须包含完整的 migration 链：
+```kotlin
+.addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+```
+
+绝不使用 `fallbackToDestructiveMigration()`——它会在 migration 缺失时静默删除所有数据。
+
+---
+
+## 10. 重复事件的月末处理
+
+### 问题
+
+1月31日创建的"每月重复"事件，在2月（只有28/29天）不会出现——因为 `date.dayOfMonth == 31` 在2月永远不成立。
+
+### 解决方案
+
+```kotlin
+rule == "monthly" -> {
+    val targetDay = eventStart.dayOfMonth
+    val lastDayOfMonth = date.lengthOfMonth()
+    date.dayOfMonth == targetDay.coerceAtMost(lastDayOfMonth)
+}
+```
+
+如果目标日期超过当月天数，取当月最后一天。同理处理闰年2月29日的年重复事件。
+
+
+---
+
+## 11. 错误状态下的用户逃生路径
+
+### 问题
+
+当天气加载失败时（网络错误、API 故障），错误页面只显示"重试"按钮。HeaderBar（包含城市选择器入口）不渲染，用户被锁死在重试循环中，无法手动选择城市。
+
+### 解决方案
+
+错误状态下也渲染 HeaderBar，让用户可以：
+- 点击城市名打开城市选择器，手动选择一个城市
+- 访问设置页
+- 访问日历页
+
+### 教训
+
+任何错误/空状态页面都必须保留导航入口。用户不应该被"锁死"在任何状态中。
+
+---
+
+## 12. Throwable vs Exception 的区别
+
+### 问题
+
+分享天气图片时，`Bitmap.createBitmap(1080, 1440)` 在低内存设备上可能抛出 `OutOfMemoryError`。代码中 `catch (Exception)` 无法捕获 `Error`（OOM 是 Error 的子类），导致 app 崩溃。
+
+### 解决方案
+
+```kotlin
+try {
+    shareWeatherImage(...)
+} catch (_: Throwable) {  // 捕获 Exception + Error
+    shareWeatherText(...)  // fallback
+}
+```
+
+### 教训
+
+涉及大内存分配（Bitmap、大数组）的操作，catch 块应该用 `Throwable` 而不是 `Exception`。
+
+---
+
+## 13. rememberSaveable vs remember
+
+### 问题
+
+日历事件表单中所有输入状态（标题、描述、时间）使用 `remember`，在屏幕旋转时全部丢失。用户正在输入一个长描述，旋转手机后所有内容消失。
+
+### 解决方案
+
+对于用户输入的文本字段，使用 `rememberSaveable` 代替 `remember`：
+```kotlin
+var newTitle by rememberSaveable { mutableStateOf("") }
+```
+
+`rememberSaveable` 会在配置变更（旋转）和进程恢复时保留状态。
+
+### 注意
+
+`rememberSaveable` 只支持可序列化类型（String、Int、Boolean 等）。复杂对象需要自定义 Saver。
+
+---
+
+## 14. BottomSheet 内的手势冲突
+
+### 问题
+
+在 `ModalBottomSheet` 内部使用 `SwipeToDismissBox`（左滑删除城市），BottomSheet 的垂直拖拽手势会拦截水平滑动，导致删除功能完全无法触发。
+
+### 解决方案
+
+放弃滑动删除，改为行内删除按钮（🗑️ 图标）+ 确认对话框。在有手势冲突的容器中，避免使用需要特定方向滑动的交互。
+
+### 适用场景
+
+任何嵌套在可拖拽容器（BottomSheet、Drawer、ViewPager）中的交互，都应该避免依赖滑动手势。改用点击操作。

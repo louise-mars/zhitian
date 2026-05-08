@@ -34,4 +34,7 @@ interface EventDao {
 
     @Query("DELETE FROM events WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM events WHERE recurrenceRule IS NOT NULL AND recurrenceRule != 'none' AND date <= :endDate ORDER BY date ASC")
+    suspend fun getRecurringBefore(endDate: String): List<EventEntity>
 }

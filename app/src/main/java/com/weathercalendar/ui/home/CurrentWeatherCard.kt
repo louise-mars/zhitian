@@ -40,47 +40,66 @@ fun CurrentWeatherCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 36.dp, horizontal = 24.dp),
+                .padding(vertical = 24.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // 天气图标
-            Text(text = weather.condition.icon, fontSize = 56.sp)
+            Text(text = weather.condition.icon, fontSize = 48.sp)
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // 温度 — 大号 Light 字重 + 字间距，视觉抓眼
+            // 温度
             Text(
                 text = weather.temperature.formatTempShort(tempUnit),
                 color = textColor,
-                fontSize = 72.sp,
+                fontSize = 60.sp,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 2.sp,
             )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
 
             // 天气描述
             Text(
                 text = weather.condition.label,
                 color = textColor,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
 
             // 体感温度 + 建议
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    text = "体感 ${weather.feelsLike.formatTempShort(tempUnit)}",
-                    color = textColor.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                // Only show feels-like when it differs from actual temperature
+                if (weather.feelsLike != weather.temperature) {
+                    Text(
+                        text = "体感 ${weather.feelsLike.formatTempShort(tempUnit)}",
+                        color = textColor.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 Text(
                     text = weather.condition.tip,
                     color = textColor.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
+                )
+            }
+
+            // 体感偏差解释（差值 >= 3°C 时显示）
+            val tempDiff = weather.feelsLike - weather.temperature
+            if (kotlin.math.abs(tempDiff) >= 3) {
+                Spacer(Modifier.height(4.dp))
+                val explanation = if (tempDiff < 0) {
+                    "🌬️ 风大体感偏冷"
+                } else {
+                    "💧 湿度高体感闷热"
+                }
+                Text(
+                    text = explanation,
+                    color = textColor.copy(alpha = 0.5f),
+                    fontSize = 12.sp,
                 )
             }
         }

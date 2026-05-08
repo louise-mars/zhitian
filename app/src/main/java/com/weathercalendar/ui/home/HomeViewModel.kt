@@ -22,6 +22,7 @@ import com.weathercalendar.data.repository.WeatherData
 import com.weathercalendar.data.repository.WeatherRepository
 import com.weathercalendar.util.LunarCalendar
 import com.weathercalendar.widget.WeatherWidgetDataProvider
+import com.weathercalendar.widget.WidgetRefreshWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,8 @@ data class HomeUiState(
     val weatherDetails: WeatherDetails = WeatherDetails(0, 0, "—", "—"),
     val rainForecast: RainForecast? = null,
     val warnings: List<WeatherWarning> = emptyList(),
+    val airQuality: com.weathercalendar.data.model.AirQuality? = null,
+    val lifeIndices: List<com.weathercalendar.data.model.LifeIndex> = emptyList(),
     val todayEvents: List<com.weathercalendar.data.model.CalendarEvent> = emptyList(),
     val fromCache: Boolean = false,
     val tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
@@ -78,7 +81,12 @@ class HomeViewModel @Inject constructor(
         appContext.getSharedPreferences("user_prefs_fallback", Context.MODE_PRIVATE)
 
     init {
-        // 不在 init 中加载数据，等 UI 准备好后由 NavHost 触发
+        // 监听温度单位变化，实时更新 UI
+        viewModelScope.launch {
+            userPrefsRepository.prefs.collect { prefs ->
+                _uiState.update { it.copy(tempUnit = prefs.temperatureUnit) }
+            }
+        }
     }
 
     fun loadData(forceRefresh: Boolean = false) {
@@ -199,6 +207,9 @@ class HomeViewModel @Inject constructor(
 
         freshDataLoaded = true
         renderWeatherData(data, today, userPrefs)
+
+        // 触发 Widget 刷新
+        WidgetRefreshWorker.enqueue(appContext)
     }
 
     private suspend fun renderWeatherData(
@@ -206,7 +217,7 @@ class HomeViewModel @Inject constructor(
         today: LocalDate,
         userPrefs: UserPrefs,
     ) {
-        val endDate = today.plusDays(6)
+        val endDate = today.plusDays(14)
 
         val eventsMap = try {
             calendarRepository.getEventsGroupedByDate(today, endDate)
@@ -225,7 +236,7 @@ class HomeViewModel @Inject constructor(
             (eventsMap[date] ?: emptyList()) + (appEventsMap[date] ?: emptyList())
         }
 
-        val days = weatherData.daily.take(7).map { daily ->
+        val days = weatherData.daily.map { daily ->
             val dayEvents = mergedEventsMap[daily.date] ?: emptyList()
             DayInfo(
                 date = daily.date,
@@ -246,6 +257,8 @@ class HomeViewModel @Inject constructor(
                 weatherDetails = weatherData.details,
                 rainForecast = weatherData.rainForecast,
                 warnings = weatherData.warnings,
+                airQuality = weatherData.airQuality,
+                lifeIndices = weatherData.lifeIndices,
                 todayEvents = mergedEventsMap[today] ?: emptyList(),
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,

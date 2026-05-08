@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +43,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,9 +89,9 @@ fun CalendarScreen(
     onBack: () -> Unit = {},
     onPrevMonth: () -> Unit = {},
     onNextMonth: () -> Unit = {},
-    onAddEvent: (LocalDate, String, java.time.LocalTime?) -> Unit = { _, _, _ -> },
+    onAddEvent: (LocalDate, String, String, java.time.LocalTime?, Int?, Long) -> Unit = { _, _, _, _, _, _ -> },
     onDeleteEvent: (Long) -> Unit = {},
-    onUpdateEvent: (Long, LocalDate, String, java.time.LocalTime?) -> Unit = { _, _, _, _ -> },
+    onUpdateEvent: (Long, LocalDate, String, String, java.time.LocalTime?, Int?, Long) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -232,16 +236,16 @@ fun CalendarScreen(
                     weatherCondition = todayWeather?.get(selectedDate)?.first,
                     tempRange = todayWeather?.get(selectedDate)?.second,
                     events = currentEvents,
-                    onAddEvent = { title, time ->
-                        onAddEvent(selectedDate!!, title, time)
+                    onAddEvent = { title, description, time, reminderMinutes, color ->
+                        onAddEvent(selectedDate!!, title, description, time, reminderMinutes, color)
                         feedbackMessage = "✓ 已添加"
                     },
                     onDeleteEvent = { id ->
                         onDeleteEvent(id)
                         feedbackMessage = "✓ 已删除"
                     },
-                    onUpdateEvent = { id, title, time ->
-                        onUpdateEvent(id, selectedDate!!, title, time)
+                    onUpdateEvent = { id, title, description, time, reminderMinutes, color ->
+                        onUpdateEvent(id, selectedDate!!, title, description, time, reminderMinutes, color)
                         feedbackMessage = "✓ 已更新"
                     },
                 )
@@ -515,14 +519,30 @@ private fun DayDetailContent(
     holidays: List<Holidays.HolidayInfo>,
     weatherCondition: WeatherCondition?, tempRange: Pair<Int, Int>?,
     events: List<CalendarEvent>,
-    onAddEvent: (String, java.time.LocalTime?) -> Unit,
+    onAddEvent: (String, String, java.time.LocalTime?, Int?, Long) -> Unit,
     onDeleteEvent: (Long) -> Unit,
-    onUpdateEvent: (Long, String, java.time.LocalTime?) -> Unit,
+    onUpdateEvent: (Long, String, String, java.time.LocalTime?, Int?, Long) -> Unit,
 ) {
     var showAddForm by remember { mutableStateOf(events.isEmpty()) }
-    var newTitle by remember { mutableStateOf("") }
+    var newTitle by rememberSaveable { mutableStateOf("") }
+    var newDescription by rememberSaveable { mutableStateOf("") }
+    var newHour by rememberSaveable { mutableStateOf("") }
+    var newMinute by rememberSaveable { mutableStateOf("") }
+    var newReminder by remember { mutableStateOf<Int?>(null) }
+    var titleError by remember { mutableStateOf(false) }
+    var newColor by remember { mutableStateOf(0xFF4CAF50L) }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editingTitle by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf<Long?>(null) }
+
+    val reminderOptions = listOf(
+        null to "不提醒",
+        0 to "事件开始时",
+        5 to "提前5分钟",
+        15 to "提前15分钟",
+        30 to "提前30分钟",
+        60 to "提前1小时",
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp)
@@ -593,33 +613,156 @@ private fun DayDetailContent(
             Text(
                 if (showAddForm) "收起" else "+ 添加",
                 fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFF4FC3F7),
-                modifier = Modifier.clickable { showAddForm = !showAddForm; newTitle = "" },
+                modifier = Modifier.clickable {
+                    showAddForm = !showAddForm
+                    newTitle = ""; newDescription = ""; newHour = ""; newMinute = ""; newReminder = null
+                },
             )
         }
         Spacer(Modifier.height(8.dp))
 
-        // 添加表单
+        // 添加表单（增强版）
         if (showAddForm) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // 标题
+            OutlinedTextField(
+                value = newTitle, onValueChange = { newTitle = it },
+                placeholder = { Text("事项名称", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
+                modifier = Modifier.fillMaxWidth().height(52.dp), singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                    cursorColor = Color(0xFF4FC3F7),
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // 描述
+            OutlinedTextField(
+                value = newDescription, onValueChange = { newDescription = it },
+                placeholder = { Text("详细描述 / 行动计划（可选）", color = Color.White.copy(alpha = 0.3f), fontSize = 13.sp) },
+                modifier = Modifier.fillMaxWidth().height(80.dp), maxLines = 3,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                    cursorColor = Color(0xFF4FC3F7),
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // 时间选择
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("⏰ ", fontSize = 14.sp)
                 OutlinedTextField(
-                    value = newTitle, onValueChange = { newTitle = it },
-                    placeholder = { Text("输入事项名称", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
-                    modifier = Modifier.weight(1f).height(52.dp), singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                    value = newHour, onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) newHour = it },
+                    placeholder = { Text("时", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
+                    modifier = Modifier.width(56.dp).height(48.dp), singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                         focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
                         cursorColor = Color(0xFF4FC3F7),
                     ),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
-                    modifier = Modifier.clickable {
-                        val trimmed = newTitle.trim()
-                        if (trimmed.length in 1..50) {
-                            onAddEvent(trimmed, null); newTitle = ""; showAddForm = false
+                Text(" : ", color = Color.White, fontSize = 16.sp)
+                OutlinedTextField(
+                    value = newMinute, onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) newMinute = it },
+                    placeholder = { Text("分", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
+                    modifier = Modifier.width(56.dp).height(48.dp), singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                        cursorColor = Color(0xFF4FC3F7),
+                    ),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text("不填 = 全天", fontSize = 11.sp, color = Color.White.copy(alpha = 0.3f))
+            }
+            // Time validation feedback
+            if (newHour.isNotBlank() || newMinute.isNotBlank()) {
+                val h = newHour.toIntOrNull()
+                val m = newMinute.toIntOrNull()
+                if (h != null && h !in 0..23 || m != null && m !in 0..59) {
+                    Text("时间格式无效（时:0-23，分:0-59）", fontSize = 12.sp, color = Color(0xFFEF5350))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // 提醒选择
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            ) {
+                Text("🔔 ", fontSize = 14.sp)
+                reminderOptions.forEach { (minutes, label) ->
+                    val selected = newReminder == minutes
+                    Text(
+                        label,
+                        fontSize = 12.sp,
+                        color = if (selected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.4f),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clickable { newReminder = minutes }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // 颜色选择
+            val colorOptions = listOf(
+                0xFF4CAF50L, 0xFF2196F3L, 0xFFF44336L, 0xFFFF9800L,
+                0xFF9C27B0L, 0xFFE91E63L, 0xFF00BCD4L, 0xFFFFEB3BL,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("🎨 ", fontSize = 14.sp)
+                colorOptions.forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(color))
+                            .clickable { newColor = color },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (newColor == color) {
+                            Text("✓", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
-                    })
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // 确定按钮
+            Text(
+                "✓ 添加日程", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
+                modifier = Modifier.clickable {
+                    val trimmed = newTitle.trim()
+                    if (trimmed.isEmpty()) {
+                        titleError = true
+                    } else if (trimmed.length > 50) {
+                        titleError = true  // Reuse titleError for both cases
+                    } else {
+                        titleError = false
+                        val time = if (newHour.isNotBlank() && newMinute.isNotBlank()) {
+                            val h = newHour.toIntOrNull() ?: 0
+                            val m = newMinute.toIntOrNull() ?: 0
+                            if (h in 0..23 && m in 0..59) java.time.LocalTime.of(h, m) else null
+                        } else null
+                        onAddEvent(trimmed, newDescription.trim(), time, newReminder, newColor)
+                        newTitle = ""; newDescription = ""; newHour = ""; newMinute = ""; newReminder = null; newColor = 0xFF4CAF50L
+                        showAddForm = false
+                    }
+                },
+            )
+            if (titleError) {
+                val errorMsg = if (newTitle.trim().isEmpty()) "请输入事项名称" else "名称不能超过50字"
+                Text(errorMsg, fontSize = 12.sp, color = Color(0xFFEF5350))
             }
             Spacer(Modifier.height(10.dp))
         }
@@ -627,47 +770,84 @@ private fun DayDetailContent(
         // 事件列表
         if (events.isNotEmpty()) {
             events.forEach { event ->
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color(event.color)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        event.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "全天",
-                        fontSize = 13.sp, color = Color.White.copy(alpha = 0.5f),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    if (editingId == event.id) {
-                        OutlinedTextField(
-                            value = editingTitle, onValueChange = { editingTitle = it },
-                            modifier = Modifier.weight(1f).height(48.dp), singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                                cursorColor = Color(0xFF4FC3F7),
-                            ),
+                Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(event.color)))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            event.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "全天",
+                            fontSize = 13.sp, color = Color.White.copy(alpha = 0.5f),
                         )
-                        Spacer(Modifier.width(4.dp))
-                        Text("✓", fontSize = 16.sp, color = Color(0xFF4FC3F7), fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable {
-                                if (editingTitle.isNotBlank()) { onUpdateEvent(event.id, editingTitle.trim(), event.time); editingId = null }
-                            })
-                        Spacer(Modifier.width(4.dp))
-                        Text("✕", fontSize = 14.sp, color = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.clickable { editingId = null })
-                    } else {
-                        Text(event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).clickable { editingId = event.id; editingTitle = event.title })
-                        Text("✕", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.clickable { onDeleteEvent(event.id) }.padding(start = 8.dp))
+                        if (event.reminderMinutes != null) {
+                            Spacer(Modifier.width(6.dp))
+                            Text("🔔", fontSize = 11.sp)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        if (editingId == event.id) {
+                            OutlinedTextField(
+                                value = editingTitle, onValueChange = { editingTitle = it },
+                                modifier = Modifier.weight(1f).height(48.dp), singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                                    focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                                    cursorColor = Color(0xFF4FC3F7),
+                                ),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("✓", fontSize = 16.sp, color = Color(0xFF4FC3F7), fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable {
+                                    if (editingTitle.isNotBlank()) {
+                                        onUpdateEvent(event.id, editingTitle.trim(), event.description, event.time, event.reminderMinutes, event.color)
+                                        editingId = null
+                                    }
+                                })
+                            Spacer(Modifier.width(4.dp))
+                            Text("✕", fontSize = 14.sp, color = Color.White.copy(alpha = 0.3f),
+                                modifier = Modifier.clickable { editingId = null })
+                        } else {
+                            Text(event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).clickable { editingId = event.id; editingTitle = event.title })
+                            Text("✕", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f),
+                                modifier = Modifier.clickable { showDeleteDialog = event.id }.padding(start = 8.dp))
+                        }
+                    }
+                    // 显示描述（如果有）
+                    if (event.description.isNotBlank() && editingId != event.id) {
+                        Text(
+                            event.description, fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f),
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 18.dp, top = 2.dp),
+                        )
                     }
                 }
             }
         } else if (!showAddForm) {
             Text("暂无日程，点击上方添加", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f))
+        }
+
+        // 删除确认对话框
+        val eventToDelete = showDeleteDialog?.let { id -> events.find { it.id == id } }
+        if (eventToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = null },
+                title = { Text("删除事件") },
+                text = { Text("确定要删除「${eventToDelete.title}」吗？") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onDeleteEvent(eventToDelete.id)
+                        showDeleteDialog = null
+                    }) {
+                        Text("删除")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = null }) {
+                        Text("取消")
+                    }
+                },
+            )
         }
     }
 }

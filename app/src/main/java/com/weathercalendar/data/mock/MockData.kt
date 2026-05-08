@@ -38,8 +38,8 @@ object MockData {
             date = today,
             weather = DailyWeather(today, WeatherCondition.SUNNY, 8, 23),
             events = listOf(
-                CalendarEvent(1, "Team Meeting", today, LocalTime.of(10, 0), 0xFF2196F3),
-                CalendarEvent(2, "Gym", today, LocalTime.of(18, 0), 0xFF4CAF50),
+                CalendarEvent(id = 1, title = "Team Meeting", date = today, time = LocalTime.of(10, 0), color = 0xFF2196F3),
+                CalendarEvent(id = 2, title = "Gym", date = today, time = LocalTime.of(18, 0), color = 0xFF4CAF50),
             ),
             lunarDate = "三月十九",
         ),
@@ -47,7 +47,7 @@ object MockData {
             date = today.plusDays(1),
             weather = DailyWeather(today.plusDays(1), WeatherCondition.RAINY, 6, 12),
             events = listOf(
-                CalendarEvent(3, "Dentist Appointment", today.plusDays(1), LocalTime.of(14, 30), 0xFFFF9800),
+                CalendarEvent(id = 3, title = "Dentist Appointment", date = today.plusDays(1), time = LocalTime.of(14, 30), color = 0xFFFF9800),
             ),
             lunarDate = "三月二十",
         ),

@@ -47,6 +47,7 @@ class CityRepository @Inject constructor(
     suspend fun searchCities(query: String): Result<List<GeocodingResult>> {
         return try {
             val response = qWeatherApi.cityLookup(query)
+            android.util.Log.d("CityRepository", "cityLookup query=$query, code=${response.code}, results=${response.location.size}")
             if (response.code != "200") {
                 return Result.success(emptyList())
             }
@@ -63,6 +64,7 @@ class CityRepository @Inject constructor(
             }
             Result.success(results)
         } catch (e: Exception) {
+            android.util.Log.w("CityRepository", "searchCities failed: ${e.javaClass.simpleName}: ${e.message}")
             Result.failure(e)
         }
     }

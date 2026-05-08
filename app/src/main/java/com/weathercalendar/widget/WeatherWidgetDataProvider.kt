@@ -35,7 +35,11 @@ object WeatherWidgetDataProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "weather_calendar.db",
-            ).fallbackToDestructiveMigration().build().also { dbInstance = it }
+            ).addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+            ).build().also { dbInstance = it }
         }
     }
 

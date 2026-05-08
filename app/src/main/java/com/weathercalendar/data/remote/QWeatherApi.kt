@@ -26,6 +26,13 @@ interface QWeatherApi {
         @Query("key") key: String = API_KEY,
     ): QWeatherDailyResponse
 
+    /** 15 天预报 */
+    @GET("v7/weather/15d")
+    suspend fun weather15d(
+        @Query("location") location: String,
+        @Query("key") key: String = API_KEY,
+    ): QWeatherDailyResponse
+
     /** 24 小时逐小时预报 */
     @GET("v7/weather/24h")
     suspend fun weather24h(
@@ -63,7 +70,7 @@ interface QWeatherApi {
     ): QWeatherWarningResponse
 
     /** 城市搜索 */
-    @GET("v7/geo/city/lookup")
+    @GET("geo/v2/city/lookup")
     suspend fun cityLookup(
         @Query("location") location: String,  // 城市名
         @Query("key") key: String = API_KEY,

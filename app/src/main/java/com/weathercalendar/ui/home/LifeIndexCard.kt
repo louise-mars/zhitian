@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,16 +15,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.model.DayInfo
+import com.weathercalendar.data.model.LifeIndex
 import com.weathercalendar.data.model.WeatherCondition
 import com.weathercalendar.ui.components.GlassCard
 
 /**
- * 生活指数卡片 — 穿衣/洗车/运动/出行建议。
- * 基于温度、天气状况、风速推算，不需要额外 API。
+ * 生活指数卡片 — 优先使用 API 返回的真实数据，否则本地推算。
  */
 @Composable
 fun LifeIndexCard(
@@ -32,36 +34,8 @@ fun LifeIndexCard(
     windSpeed: Int,
     textColor: Color,
     modifier: Modifier = Modifier,
+    lifeIndices: List<LifeIndex> = emptyList(),
 ) {
-    val temp = currentWeather.temperature
-    val condition = currentWeather.condition
-    val tempMin = todayInfo?.weather?.tempMin ?: temp
-    val tempMax = todayInfo?.weather?.tempMax ?: temp
-    val tempDiff = tempMax - tempMin
-
-    val indices = listOf(
-        LifeIndex(
-            icon = dressingIcon(temp),
-            label = "穿衣",
-            value = dressingAdvice(temp),
-        ),
-        LifeIndex(
-            icon = if (isGoodForCarWash(condition)) "🚗" else "💧",
-            label = "洗车",
-            value = carWashAdvice(condition),
-        ),
-        LifeIndex(
-            icon = if (isGoodForExercise(condition, temp, windSpeed)) "🏃" else "🏠",
-            label = "运动",
-            value = exerciseAdvice(condition, temp, windSpeed),
-        ),
-        LifeIndex(
-            icon = travelIcon(condition),
-            label = "出行",
-            value = travelAdvice(condition, tempDiff),
-        ),
-    )
-
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         alpha = 0.12f,
@@ -80,36 +54,159 @@ fun LifeIndexCard(
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.height(12.dp))
+
+            if (lifeIndices.isNotEmpty()) {
+                // 使用 API 真实数据 — 2 列 grid
+                ApiLifeIndicesGrid(lifeIndices = lifeIndices, textColor = textColor)
+            } else {
+                // 本地推算 fallback
+                LocalLifeIndicesRow(
+                    currentWeather = currentWeather,
+                    todayInfo = todayInfo,
+                    windSpeed = windSpeed,
+                    textColor = textColor,
+                )
+            }
+        }
+    }
+}
+
+// ── API 数据展示：2 列 grid ──
+
+@Composable
+private fun ApiLifeIndicesGrid(
+    lifeIndices: List<LifeIndex>,
+    textColor: Color,
+) {
+    // 取前 8 个，按 2 列排列
+    val items = lifeIndices.take(8)
+    val rows = items.chunked(2)
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        rows.forEach { rowItems ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                indices.forEach { index ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                rowItems.forEach { index ->
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(text = index.icon, fontSize = 24.sp)
-                        Spacer(Modifier.height(4.dp))
                         Text(
-                            text = index.label,
-                            color = textColor.copy(alpha = 0.5f),
-                            fontSize = 11.sp,
+                            text = emojiForType(index.type),
+                            fontSize = 20.sp,
                         )
-                        Text(
-                            text = index.value,
-                            color = textColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                        )
+                        Spacer(Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = index.name.replace("指数", ""),
+                                color = textColor.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = index.category,
+                                color = textColor,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
+                }
+                // 如果奇数个，填充空位
+                if (rowItems.size < 2) {
+                    Spacer(Modifier.weight(1f))
                 }
             }
         }
     }
 }
 
-private data class LifeIndex(val icon: String, val label: String, val value: String)
+/**
+ * 根据生活指数 type 返回对应 emoji。
+ */
+private fun emojiForType(type: String): String = when (type) {
+    "1" -> "🏃"   // 运动
+    "2" -> "🚗"   // 洗车
+    "3" -> "👔"   // 穿衣
+    "5" -> "☀️"   // 紫外线
+    "6" -> "🧳"   // 旅游
+    "8" -> "😊"   // 舒适度
+    "9" -> "🤧"   // 感冒
+    "10" -> "🌫"  // 空气
+    else -> "📋"
+}
+
+// ── 本地推算 fallback ──
+
+@Composable
+private fun LocalLifeIndicesRow(
+    currentWeather: CurrentWeather,
+    todayInfo: DayInfo?,
+    windSpeed: Int,
+    textColor: Color,
+) {
+    val temp = currentWeather.temperature
+    val condition = currentWeather.condition
+    val tempMin = todayInfo?.weather?.tempMin ?: temp
+    val tempMax = todayInfo?.weather?.tempMax ?: temp
+    val tempDiff = tempMax - tempMin
+
+    val indices = listOf(
+        LocalIndex(
+            icon = dressingIcon(temp),
+            label = "穿衣",
+            value = dressingAdvice(temp),
+        ),
+        LocalIndex(
+            icon = if (isGoodForCarWash(condition)) "🚗" else "💧",
+            label = "洗车",
+            value = carWashAdvice(condition),
+        ),
+        LocalIndex(
+            icon = if (isGoodForExercise(condition, temp, windSpeed)) "🏃" else "🏠",
+            label = "运动",
+            value = exerciseAdvice(condition, temp, windSpeed),
+        ),
+        LocalIndex(
+            icon = travelIcon(condition),
+            label = "出行",
+            value = travelAdvice(condition, tempDiff),
+        ),
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        indices.forEach { index ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(text = index.icon, fontSize = 24.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = index.label,
+                    color = textColor.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
+                )
+                Text(
+                    text = index.value,
+                    color = textColor,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+private data class LocalIndex(val icon: String, val label: String, val value: String)
 
 // ── 穿衣建议 ──
 

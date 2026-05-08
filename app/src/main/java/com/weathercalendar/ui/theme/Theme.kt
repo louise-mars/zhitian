@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.weathercalendar.data.repository.ThemeMode
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF0288D1),
@@ -47,7 +48,12 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun WeatherCalendarTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.FOLLOW_SYSTEM,
+    darkTheme: Boolean = when (themeMode) {
+        ThemeMode.ALWAYS_DARK -> true
+        ThemeMode.ALWAYS_LIGHT -> false
+        ThemeMode.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+    },
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {

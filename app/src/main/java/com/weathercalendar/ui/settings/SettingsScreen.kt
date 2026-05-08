@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.weathercalendar.data.repository.TemperatureUnit
+import com.weathercalendar.data.repository.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +98,31 @@ fun SettingsScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "${unit.label}（${unit.symbol}）",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // ── 主题 ──
+            SectionTitle("主题")
+            Spacer(Modifier.height(8.dp))
+            ThemeMode.entries.forEach { mode ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.setThemeMode(mode) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = uiState.themeMode == mode,
+                        onClick = { viewModel.setThemeMode(mode) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = mode.label,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
@@ -236,7 +262,11 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable {
-                    uriHandler.openUri("https://github.com/louise-mars/zhitian/blob/main/docs/PRIVACY_POLICY.md")
+                    try {
+                        uriHandler.openUri("https://github.com/louise-mars/zhitian/blob/main/docs/PRIVACY_POLICY.md")
+                    } catch (_: Exception) {
+                        // No browser installed, silently ignore
+                    }
                 },
             )
 

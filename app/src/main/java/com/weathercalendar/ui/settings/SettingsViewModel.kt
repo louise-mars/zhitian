@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.weathercalendar.data.remote.GeocodingResult
 import com.weathercalendar.data.repository.CityRepository
 import com.weathercalendar.data.repository.TemperatureUnit
+import com.weathercalendar.data.repository.ThemeMode
 import com.weathercalendar.data.repository.UserPrefs
 import com.weathercalendar.data.repository.UserPrefsRepository
 import com.weathercalendar.notification.WeatherNotificationWorker
@@ -81,5 +82,9 @@ class SettingsViewModel @Inject constructor(
             userPrefsRepository.setDefaultCity(name, lat, lon)
             _citySearchResults.value = emptyList()
         }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { userPrefsRepository.setThemeMode(mode) }
     }
 }

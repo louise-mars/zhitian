@@ -26,15 +26,9 @@ data class LocationResult(
 class LocationService @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private var client: AMapLocationClient? = null
-
     init {
         AMapLocationClient.updatePrivacyShow(context, true, true)
         AMapLocationClient.updatePrivacyAgree(context, true)
-    }
-
-    private fun getClient(): AMapLocationClient {
-        return client ?: AMapLocationClient(context).also { client = it }
     }
 
     suspend fun getCurrentLocation(): Result<LocationResult> {
@@ -47,7 +41,8 @@ class LocationService @Inject constructor(
             withTimeout(8_000L) {
                 suspendCancellableCoroutine { cont ->
                     var resumed = false
-                    val locationClient = getClient()
+                    // 每次创建新 client，避免并发调用共享 listener 的竞态
+                    val locationClient = AMapLocationClient(context)
                     val option = AMapLocationClientOption().apply {
                         locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
                         isOnceLocation = true
@@ -59,15 +54,19 @@ class LocationService @Inject constructor(
 
                     locationClient.setLocationListener { location ->
                         locationClient.stopLocation()
+                        locationClient.onDestroy()
                         if (resumed) return@setLocationListener
                         resumed = true
 
                         if (location != null && location.errorCode == 0) {
-                            val city = location.district?.removeSuffix("区")?.removeSuffix("县")?.removeSuffix("市")
-                                ?: location.city?.removeSuffix("市")
-                                ?: location.province
-                                ?: "未知"
-                            Log.d(TAG, "高德定位成功: lat=${location.latitude}, lon=${location.longitude}, city=${location.city}, district=${location.district}, display=$city")
+                            val district = location.district?.removeSuffix("区")?.removeSuffix("县")?.removeSuffix("市")
+                            val street = location.street?.removeSuffix("街道")?.removeSuffix("镇")?.removeSuffix("乡")
+                            val city = when {
+                                district != null && !street.isNullOrBlank() -> "$district·$street"
+                                district != null -> district
+                                else -> location.city?.removeSuffix("市") ?: location.province ?: "未知"
+                            }
+                            Log.d(TAG, "高德定位成功: lat=${location.latitude}, lon=${location.longitude}, display=$city")
                             cont.resume(
                                 Result.success(
                                     LocationResult(
@@ -86,6 +85,7 @@ class LocationService @Inject constructor(
 
                     cont.invokeOnCancellation {
                         locationClient.stopLocation()
+                        locationClient.onDestroy()
                     }
 
                     locationClient.startLocation()

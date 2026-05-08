@@ -28,6 +28,8 @@ data class WeatherData(
     val details: WeatherDetails,
     val rainForecast: RainForecast? = null,
     val warnings: List<WeatherWarning> = emptyList(),
+    val airQuality: com.weathercalendar.data.model.AirQuality? = null,
+    val lifeIndices: List<com.weathercalendar.data.model.LifeIndex> = emptyList(),
     val fromCache: Boolean = false,
 )
 

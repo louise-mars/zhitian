@@ -20,10 +20,17 @@ enum class TemperatureUnit(val label: String, val symbol: String) {
     FAHRENHEIT("华氏度", "°F"),
 }
 
+enum class ThemeMode(val label: String) {
+    FOLLOW_SYSTEM("跟随系统"),
+    ALWAYS_LIGHT("浅色"),
+    ALWAYS_DARK("深色"),
+}
+
 data class UserPrefs(
     val temperatureUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
     val useLocation: Boolean = true,
     val weatherNotification: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.FOLLOW_SYSTEM,
     val defaultCityName: String = "北京",
     val defaultCityLat: Double = 39.9042,
     val defaultCityLon: Double = 116.4074,
@@ -39,6 +46,7 @@ class UserPrefsRepository @Inject constructor(
         private val KEY_TEMP_UNIT = stringPreferencesKey("temp_unit")
         private val KEY_USE_LOCATION = booleanPreferencesKey("use_location")
         private val KEY_WEATHER_NOTIFICATION = booleanPreferencesKey("weather_notification")
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_DEFAULT_CITY = stringPreferencesKey("default_city")
         private val KEY_DEFAULT_LAT = stringPreferencesKey("default_lat")
         private val KEY_DEFAULT_LON = stringPreferencesKey("default_lon")
@@ -53,6 +61,9 @@ class UserPrefsRepository @Inject constructor(
             },
             useLocation = p[KEY_USE_LOCATION] ?: true,
             weatherNotification = p[KEY_WEATHER_NOTIFICATION] ?: false,
+            themeMode = try {
+                ThemeMode.valueOf(p[KEY_THEME_MODE] ?: "FOLLOW_SYSTEM")
+            } catch (_: Exception) { ThemeMode.FOLLOW_SYSTEM },
             defaultCityName = p[KEY_DEFAULT_CITY] ?: "北京",
             defaultCityLat = p[KEY_DEFAULT_LAT]?.toDoubleOrNull() ?: 39.9042,
             defaultCityLon = p[KEY_DEFAULT_LON]?.toDoubleOrNull() ?: 116.4074,
@@ -69,6 +80,10 @@ class UserPrefsRepository @Inject constructor(
 
     suspend fun setWeatherNotification(enabled: Boolean) {
         store.edit { it[KEY_WEATHER_NOTIFICATION] = enabled }
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        store.edit { it[KEY_THEME_MODE] = mode.name }
     }
 
     suspend fun setDefaultCity(name: String, lat: Double, lon: Double) {

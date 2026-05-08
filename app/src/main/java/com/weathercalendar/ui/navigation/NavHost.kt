@@ -22,6 +22,7 @@ import com.weathercalendar.ui.city.CityPickerSheet
 import com.weathercalendar.ui.city.CityViewModel
 import com.weathercalendar.ui.home.HomeScreen
 import com.weathercalendar.ui.home.HomeViewModel
+import com.weathercalendar.ui.home.shareWeatherImage
 import com.weathercalendar.ui.home.shareWeatherText
 import com.weathercalendar.ui.permission.PermissionScreen
 import com.weathercalendar.ui.settings.SettingsScreen
@@ -88,6 +89,8 @@ fun WeatherCalendarNavHost() {
                 rainForecast = uiState.rainForecast,
                 warnings = uiState.warnings,
                 todayEvents = uiState.todayEvents,
+                airQuality = uiState.airQuality,
+                lifeIndices = uiState.lifeIndices,
                 isLoading = uiState.isLoading,
                 fromCache = uiState.fromCache,
                 error = uiState.error,
@@ -96,13 +99,23 @@ fun WeatherCalendarNavHost() {
                 onCalendarClick = { navController.navigate(Routes.CALENDAR) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onShareClick = {
-                    shareWeatherText(
-                        context = context,
-                        cityName = uiState.cityName,
-                        dateText = uiState.dateText,
-                        currentWeather = uiState.currentWeather,
-                        lunarText = uiState.lunarText,
-                    )
+                    try {
+                        shareWeatherImage(
+                            context = context,
+                            cityName = uiState.cityName,
+                            dateText = uiState.dateText,
+                            currentWeather = uiState.currentWeather,
+                            lunarText = uiState.lunarText,
+                        )
+                    } catch (_: Throwable) {  // Catches both Exception and Error (OOM)
+                        shareWeatherText(
+                            context = context,
+                            cityName = uiState.cityName,
+                            dateText = uiState.dateText,
+                            currentWeather = uiState.currentWeather,
+                            lunarText = uiState.lunarText,
+                        )
+                    }
                 },
                 onRefresh = { homeViewModel.loadData(forceRefresh = true) },
             )
@@ -122,20 +135,16 @@ fun WeatherCalendarNavHost() {
                 onBack = { navController.popBackStack() },
                 onPrevMonth = { viewModel.changeMonth(-1) },
                 onNextMonth = { viewModel.changeMonth(1) },
-                onAddEvent = { date, title, time -> viewModel.addEvent(title, date, time) },
+                onAddEvent = { date, title, description, time, reminder, color -> viewModel.addEvent(title, date, time, description, reminder, color) },
                 onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
-                onUpdateEvent = { id, date, title, time -> viewModel.updateEvent(id, title, date, time) },
+                onUpdateEvent = { id, date, title, description, time, reminder, color -> viewModel.updateEvent(id, title, date, time, description, reminder, color) },
             )
         }
 
         // ── 设置页 ──
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = {
-                    navController.popBackStack()
-                    // 设置变更后刷新首页（温度单位等）
-                    homeViewModel.loadData(forceRefresh = true)
-                },
+                onBack = { navController.popBackStack() },
             )
         }
     }
@@ -155,6 +164,7 @@ fun WeatherCalendarNavHost() {
             currentCityName = homeViewModel.uiState.value.cityName,
             searchResults = cityState.searchResults,
             isSearching = cityState.isSearching,
+            searchError = cityState.searchError,
             onSearch = { cityViewModel.search(it) },
             onCitySelected = { city ->
                 if (city.isCurrentLocation) {
@@ -172,6 +182,7 @@ fun WeatherCalendarNavHost() {
                 showCityPicker = false
             },
             onAddCity = { cityViewModel.addCity(it) },
+            onDeleteCity = { cityViewModel.removeCity(it) },
             onDismiss = { showCityPicker = false },
         )
     }
