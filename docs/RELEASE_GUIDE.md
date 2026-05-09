@@ -98,7 +98,7 @@ keytool -list -v -keystore zhitian-release.jks -alias zhitian
 - 事件提醒通知
 - 天气预警
 - 分钟级降雨预报
-- 每日诗词（根据天气/季节匹配，400+ 首）
+- 每日诗词（根据天气/季节匹配，400+ 首，点击展开完整全文）
 - 天气卡片图片分享（带 fallback 到文本分享）
 - 桌面 Widget（每小时自动刷新）
 - 深色模式（跟随系统/手动切换）

@@ -532,16 +532,18 @@ private fun DayDetailContent(
     var titleError by remember { mutableStateOf(false) }
     var newColor by remember { mutableStateOf(0xFF4CAF50L) }
     var editingId by remember { mutableStateOf<Long?>(null) }
-    var editingTitle by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf<Long?>(null) }
 
     val reminderOptions = listOf(
         null to "不提醒",
-        0 to "事件开始时",
-        5 to "提前5分钟",
-        15 to "提前15分钟",
-        30 to "提前30分钟",
-        60 to "提前1小时",
+        0 to "开始时",
+        5 to "5分钟前",
+        15 to "15分钟前",
+        30 to "30分钟前",
+        60 to "1小时前",
+        120 to "2小时前",
+        1440 to "1天前",
+        10080 to "1周前",
     )
 
     Column(
@@ -576,7 +578,7 @@ private fun DayDetailContent(
                     Text("${h.emoji} ", fontSize = 14.sp)
                     Text(h.name, fontSize = 14.sp, color = Color(0xFFFFD54F), fontWeight = FontWeight.Medium)
                     Text(
-                        when (h.country) { "CN" -> " 🇨🇳"; "SE" -> " 🇸🇪"; "US" -> " 🇺🇸"; else -> "" },
+                        when (h.country) { "CN" -> " 🇨🇳"; "SE" -> " 🇸🇪"; "US" -> " 🇺🇸"; "INT" -> " 🌍"; else -> "" },
                         fontSize = 12.sp,
                     )
                 }
@@ -651,62 +653,76 @@ private fun DayDetailContent(
             )
             Spacer(Modifier.height(8.dp))
 
-            // 时间选择
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 时间选择（点击弹出选择器）
+            var showTimePicker by remember { mutableStateOf(false) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showTimePicker = true }
+                    .padding(vertical = 8.dp),
+            ) {
                 Text("⏰ ", fontSize = 14.sp)
-                OutlinedTextField(
-                    value = newHour, onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) newHour = it },
-                    placeholder = { Text("时", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
-                    modifier = Modifier.width(56.dp).height(48.dp), singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        cursorColor = Color(0xFF4FC3F7),
-                    ),
+                val timeDisplay = if (newHour.isNotBlank() && newMinute.isNotBlank()) {
+                    "${newHour.padStart(2, '0')}:${newMinute.padStart(2, '0')}"
+                } else "全天（点击设置时间）"
+                Text(
+                    timeDisplay,
+                    fontSize = 14.sp,
+                    color = if (newHour.isNotBlank()) Color.White else Color.White.copy(alpha = 0.4f),
                 )
-                Text(" : ", color = Color.White, fontSize = 16.sp)
-                OutlinedTextField(
-                    value = newMinute, onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) newMinute = it },
-                    placeholder = { Text("分", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
-                    modifier = Modifier.width(56.dp).height(48.dp), singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        cursorColor = Color(0xFF4FC3F7),
-                    ),
-                )
-                Spacer(Modifier.width(12.dp))
-                Text("不填 = 全天", fontSize = 11.sp, color = Color.White.copy(alpha = 0.3f))
-            }
-            // Time validation feedback
-            if (newHour.isNotBlank() || newMinute.isNotBlank()) {
-                val h = newHour.toIntOrNull()
-                val m = newMinute.toIntOrNull()
-                if (h != null && h !in 0..23 || m != null && m !in 0..59) {
-                    Text("时间格式无效（时:0-23，分:0-59）", fontSize = 12.sp, color = Color(0xFFEF5350))
+                if (newHour.isNotBlank()) {
+                    Spacer(Modifier.width(12.dp))
+                    Text("✕", fontSize = 12.sp, color = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.clickable { newHour = ""; newMinute = "" })
                 }
+            }
+            // 时间选择对话框
+            if (showTimePicker) {
+                TimePickerDialog(
+                    initialHour = newHour.toIntOrNull() ?: 9,
+                    initialMinute = newMinute.toIntOrNull() ?: 0,
+                    onConfirm = { h, m ->
+                        newHour = h.toString()
+                        newMinute = m.toString()
+                        showTimePicker = false
+                    },
+                    onDismiss = { showTimePicker = false },
+                )
             }
             Spacer(Modifier.height(8.dp))
 
-            // 提醒选择
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-            ) {
-                Text("🔔 ", fontSize = 14.sp)
-                reminderOptions.forEach { (minutes, label) ->
-                    val selected = newReminder == minutes
-                    Text(
-                        label,
-                        fontSize = 12.sp,
-                        color = if (selected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.4f),
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier
-                            .clickable { newReminder = minutes }
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                    )
+            // 提醒选择（下拉菜单）
+            var showReminderMenu by remember { mutableStateOf(false) }
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showReminderMenu = true }
+                        .padding(vertical = 8.dp),
+                ) {
+                    Text("🔔 ", fontSize = 14.sp)
+                    val reminderLabel = reminderOptions.find { it.first == newReminder }?.second ?: "不提醒"
+                    Text(reminderLabel, fontSize = 14.sp, color = Color.White)
+                    Text(" ▾", fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+                }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = showReminderMenu,
+                    onDismissRequest = { showReminderMenu = false },
+                ) {
+                    reminderOptions.forEach { (minutes, label) ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                newReminder = minutes
+                                showReminderMenu = false
+                            },
+                            leadingIcon = {
+                                if (newReminder == minutes) Text("✓", fontSize = 14.sp)
+                            },
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -739,14 +755,15 @@ private fun DayDetailContent(
             Spacer(Modifier.height(12.dp))
 
             // 确定按钮
+            val buttonLabel = if (editingId != null) "✓ 保存修改" else "✓ 添加日程"
             Text(
-                "✓ 添加日程", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
+                buttonLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4FC3F7),
                 modifier = Modifier.clickable {
                     val trimmed = newTitle.trim()
                     if (trimmed.isEmpty()) {
                         titleError = true
                     } else if (trimmed.length > 50) {
-                        titleError = true  // Reuse titleError for both cases
+                        titleError = true
                     } else {
                         titleError = false
                         val time = if (newHour.isNotBlank() && newMinute.isNotBlank()) {
@@ -754,12 +771,29 @@ private fun DayDetailContent(
                             val m = newMinute.toIntOrNull() ?: 0
                             if (h in 0..23 && m in 0..59) java.time.LocalTime.of(h, m) else null
                         } else null
-                        onAddEvent(trimmed, newDescription.trim(), time, newReminder, newColor)
+                        if (editingId != null) {
+                            onUpdateEvent(editingId!!, trimmed, newDescription.trim(), time, newReminder, newColor)
+                            editingId = null
+                        } else {
+                            onAddEvent(trimmed, newDescription.trim(), time, newReminder, newColor)
+                        }
                         newTitle = ""; newDescription = ""; newHour = ""; newMinute = ""; newReminder = null; newColor = 0xFF4CAF50L
                         showAddForm = false
                     }
                 },
             )
+            // 编辑模式下显示取消按钮
+            if (editingId != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "取消编辑", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.clickable {
+                        editingId = null
+                        newTitle = ""; newDescription = ""; newHour = ""; newMinute = ""; newReminder = null; newColor = 0xFF4CAF50L
+                        showAddForm = false
+                    },
+                )
+            }
             if (titleError) {
                 val errorMsg = if (newTitle.trim().isEmpty()) "请输入事项名称" else "名称不能超过50字"
                 Text(errorMsg, fontSize = 12.sp, color = Color(0xFFEF5350))
@@ -783,38 +817,24 @@ private fun DayDetailContent(
                             Text("🔔", fontSize = 11.sp)
                         }
                         Spacer(Modifier.width(10.dp))
-                        if (editingId == event.id) {
-                            OutlinedTextField(
-                                value = editingTitle, onValueChange = { editingTitle = it },
-                                modifier = Modifier.weight(1f).height(48.dp), singleLine = true,
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                                    focusedBorderColor = Color(0xFF4FC3F7), unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                                    cursorColor = Color(0xFF4FC3F7),
-                                ),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text("✓", fontSize = 16.sp, color = Color(0xFF4FC3F7), fontWeight = FontWeight.Bold,
-                                modifier = Modifier.clickable {
-                                    if (editingTitle.isNotBlank()) {
-                                        onUpdateEvent(event.id, editingTitle.trim(), event.description, event.time, event.reminderMinutes, event.color)
-                                        editingId = null
-                                    }
-                                })
-                            Spacer(Modifier.width(4.dp))
-                            Text("✕", fontSize = 14.sp, color = Color.White.copy(alpha = 0.3f),
-                                modifier = Modifier.clickable { editingId = null })
-                        } else {
-                            Text(event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f).clickable { editingId = event.id; editingTitle = event.title })
-                            Text("✕", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f),
-                                modifier = Modifier.clickable { showDeleteDialog = event.id }.padding(start = 8.dp))
-                        }
+                        Text(event.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).clickable {
+                                // 点击进入编辑模式：填充表单
+                                editingId = event.id
+                                newTitle = event.title
+                                newDescription = event.description
+                                newHour = event.time?.hour?.toString() ?: ""
+                                newMinute = event.time?.minute?.toString() ?: ""
+                                newReminder = event.reminderMinutes
+                                newColor = event.color
+                                showAddForm = true
+                            })
+                        Text("✕", fontSize = 13.sp, color = Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.clickable { showDeleteDialog = event.id }.padding(start = 8.dp))
                     }
                     // 显示描述（如果有）
-                    if (event.description.isNotBlank() && editingId != event.id) {
+                    if (event.description.isNotBlank()) {
                         Text(
                             event.description, fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f),
                             maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -850,4 +870,74 @@ private fun DayDetailContent(
             )
         }
     }
+}
+
+// ─────────────────────────────────────────────
+// 时间选择对话框
+// ─────────────────────────────────────────────
+
+@Composable
+private fun TimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onConfirm: (Int, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var hour by remember { mutableStateOf(initialHour) }
+    var minute by remember { mutableStateOf(initialMinute) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择时间") },
+        text = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // 小时选择
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = { hour = (hour + 1) % 24 }) {
+                        Text("▲", fontSize = 18.sp)
+                    }
+                    Text(
+                        text = hour.toString().padStart(2, '0'),
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    IconButton(onClick = { hour = if (hour > 0) hour - 1 else 23 }) {
+                        Text("▼", fontSize = 18.sp)
+                    }
+                }
+
+                Text(":", fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp))
+
+                // 分钟选择
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = { minute = (minute + 5) % 60 }) {
+                        Text("▲", fontSize = 18.sp)
+                    }
+                    Text(
+                        text = minute.toString().padStart(2, '0'),
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    IconButton(onClick = { minute = if (minute >= 5) minute - 5 else 55 }) {
+                        Text("▼", fontSize = 18.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(hour, minute) }) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
 }

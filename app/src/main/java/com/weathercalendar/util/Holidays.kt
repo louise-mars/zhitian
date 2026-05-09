@@ -20,6 +20,9 @@ object Holidays {
     fun getHolidays(date: LocalDate): List<HolidayInfo> {
         return buildList {
             getChineseSolarHoliday(date)?.let { add(it) }
+            getInternationalHoliday(date)?.let { add(it) }
+            getSwedishHoliday(date)?.let { add(it) }
+            getUSHoliday(date)?.let { add(it) }
         }
     }
 
@@ -39,10 +42,8 @@ object Holidays {
         val md = date.monthValue * 100 + date.dayOfMonth
         return when (md) {
             101 -> HolidayInfo("元旦", "CN", "🎉")
-            214 -> HolidayInfo("情人节", "CN", "💕")
             308 -> HolidayInfo("妇女节", "CN", "👩")
             312 -> HolidayInfo("植树节", "CN", "🌳")
-            401 -> HolidayInfo("愚人节", "CN", "🤡")
             501 -> HolidayInfo("劳动节", "CN", "💪")
             504 -> HolidayInfo("青年节", "CN", "🧑")
             601 -> HolidayInfo("儿童节", "CN", "👶")
@@ -50,9 +51,42 @@ object Holidays {
             801 -> HolidayInfo("建军节", "CN", "🎖️")
             910 -> HolidayInfo("教师节", "CN", "📚")
             1001 -> HolidayInfo("国庆节", "CN", "🇨🇳")
-            1225 -> HolidayInfo("圣诞节", "CN", "🎄")
             else -> null
         }
+    }
+
+    // ─────────────────────────────────────────
+    // 国际通用节日（不分国家）
+    // ─────────────────────────────────────────
+
+    private fun getInternationalHoliday(date: LocalDate): HolidayInfo? {
+        val md = date.monthValue * 100 + date.dayOfMonth
+        val year = date.year
+
+        // 固定日期节日
+        val fixed = when (md) {
+            214 -> HolidayInfo("情人节", "INT", "💕")
+            401 -> HolidayInfo("愚人节", "INT", "🤡")
+            422 -> HolidayInfo("地球日", "INT", "🌍")
+            1031 -> HolidayInfo("万圣节", "INT", "🎃")
+            1111 -> HolidayInfo("双十一", "INT", "🛒")
+            1225 -> HolidayInfo("圣诞节", "INT", "🎄")
+            1226 -> HolidayInfo("节礼日", "INT", "🎁")
+            1231 -> HolidayInfo("跨年夜", "INT", "🎆")
+            else -> null
+        }
+        if (fixed != null) return fixed
+
+        // 母亲节：5月第2个周日
+        if (date == nthWeekday(year, 5, DayOfWeek.SUNDAY, 2)) {
+            return HolidayInfo("母亲节", "INT", "💐")
+        }
+        // 父亲节：6月第3个周日
+        if (date == nthWeekday(year, 6, DayOfWeek.SUNDAY, 3)) {
+            return HolidayInfo("父亲节", "INT", "👔")
+        }
+
+        return null
     }
 
     // ─────────────────────────────────────────

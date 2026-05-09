@@ -19,18 +19,26 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import com.weathercalendar.data.model.WeatherCondition
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * 天气动态背景叠加层 — Canvas 粒子动画（iOS 级）。
+ * 宫崎骏风格天气动画叠加层 — 柔和自然的粒子动画。
  *
- * 架构：WeatherCondition → 对应的 Effect 组合
- * 叠在渐变背景之上、内容之下。
+ * 设计理念：模仿吉卜力动画中的自然元素
+ * - 蓬松积云（多圆组合）
+ * - 丁达尔光束
+ * - 飘落花瓣/树叶
+ * - 萤火虫光点（夜间）
+ * - 手绘感雨滴
  */
 @Composable
 fun WeatherAnimationOverlay(
@@ -40,158 +48,180 @@ fun WeatherAnimationOverlay(
 ) {
     when (condition) {
         WeatherCondition.RAINY, WeatherCondition.DRIZZLE ->
-            RainEffect(
+            GhibliRainEffect(
                 modifier = modifier,
-                intensity = if (condition == WeatherCondition.DRIZZLE) 50 else 100,
+                intensity = if (condition == WeatherCondition.DRIZZLE) 40 else 80,
             )
         WeatherCondition.SNOWY ->
-            SnowEffect(modifier = modifier)
+            GhibliSnowEffect(modifier = modifier)
         WeatherCondition.CLOUDY, WeatherCondition.PARTLY_CLOUDY ->
-            CloudEffect(modifier = modifier)
+            GhibliCloudEffect(modifier = modifier)
         WeatherCondition.STORMY ->
-            StormEffect(modifier = modifier)
+            GhibliStormEffect(modifier = modifier)
         WeatherCondition.SUNNY ->
-            if (isDay) SunLightEffect(modifier = modifier)
+            if (isDay) GhibliSunEffect(modifier = modifier)
+            else GhibliNightEffect(modifier = modifier)
         WeatherCondition.FOGGY ->
-            FogEffect(modifier = modifier)
+            GhibliFogEffect(modifier = modifier)
+    }
+
+    // 季节性飘落物（所有天气都有，增加氛围）
+    if (isDay) {
+        SeasonalParticles(modifier = modifier)
+    } else {
+        GhibliNightEffect(modifier = modifier)
     }
 }
 
 // ═════════════════════════════════════════════
-// ☀️ 晴天：双层光晕呼吸 + 光线旋转
+// ☀️ 晴天：丁达尔光束 + 柔和光晕
 // ═════════════════════════════════════════════
 
 @Composable
-private fun SunLightEffect(modifier: Modifier = Modifier) {
+private fun GhibliSunEffect(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "sun")
 
-    // 主光晕呼吸
     val glowAlpha by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "mainGlow",
+        initialValue = 0.15f, targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "glow",
     )
-    val glowRadius by transition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "mainRadius",
-    )
-
-    // 次光晕（偏移，更柔和）
-    val secondAlpha by transition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(5500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "secondGlow",
-    )
-
-    // 光线旋转角度
-    val rayAngle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(30000, easing = LinearEasing),
-        ),
-        label = "rayRotation",
+    val beamAngle by transition.animateFloat(
+        initialValue = -5f, targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "beam",
     )
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val cx = w * 0.5f
-        val cy = h * 0.12f
 
-        // 主光晕
-        val r1 = w * glowRadius
+        // 柔和大光晕（水彩感）
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFFFFD54F).copy(alpha = glowAlpha),
-                    Color(0xFFFFF176).copy(alpha = glowAlpha * 0.3f),
+                    Color(0xFFFFF8E1).copy(alpha = glowAlpha),
+                    Color(0xFFFFE082).copy(alpha = glowAlpha * 0.4f),
                     Color.Transparent,
                 ),
-                center = Offset(cx, cy),
-                radius = r1,
+                center = Offset(w * 0.6f, h * 0.08f),
+                radius = w * 0.7f,
             ),
-            radius = r1,
-            center = Offset(cx, cy),
+            radius = w * 0.7f,
+            center = Offset(w * 0.6f, h * 0.08f),
         )
 
-        // 次光晕（偏下偏大）
-        val r2 = w * 0.7f
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = secondAlpha),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy + h * 0.05f),
-                radius = r2,
-            ),
-            radius = r2,
-            center = Offset(cx, cy + h * 0.05f),
-        )
+        // 丁达尔光束（从右上角斜射）
+        val beamCount = 5
+        for (i in 0 until beamCount) {
+            val baseAngle = 35f + i * 8f + beamAngle
+            val beamAlpha = glowAlpha * (0.15f + i * 0.03f)
+            rotate(degrees = baseAngle, pivot = Offset(w * 0.85f, 0f)) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFFF176).copy(alpha = beamAlpha),
+                            Color.Transparent,
+                        ),
+                    ),
+                    topLeft = Offset(w * 0.85f, 0f),
+                    size = Size(12f + i * 4f, h * 0.7f),
+                )
+            }
+        }
+    }
+}
 
-        // 旋转光线（8 条，更粗更亮）
-        val rayCount = 8
-        val rayLength = w * 0.5f
-        for (i in 0 until rayCount) {
-            val angle = Math.toRadians((rayAngle + i * 360.0 / rayCount).toDouble())
-            val endX = cx + (rayLength * kotlin.math.cos(angle)).toFloat()
-            val endY = cy + (rayLength * kotlin.math.sin(angle)).toFloat()
-            drawLine(
-                color = Color(0xFFFFD54F).copy(alpha = glowAlpha * 0.5f),
-                start = Offset(cx, cy),
-                end = Offset(endX, endY),
-                strokeWidth = 4f,
-                cap = StrokeCap.Round,
+// ═════════════════════════════════════════════
+// 🌙 夜间：萤火虫光点
+// ═════════════════════════════════════════════
+
+private data class Firefly(
+    var x: Float,
+    var y: Float,
+    val speed: Float,
+    val radius: Float,
+    var alpha: Float,
+    val pulseSpeed: Float,
+    val driftX: Float,
+)
+
+@Composable
+private fun GhibliNightEffect(modifier: Modifier = Modifier) {
+    var frameTime by remember { mutableLongStateOf(0L) }
+
+    val fireflies = remember {
+        List(20) {
+            Firefly(
+                x = Random.nextFloat(),
+                y = Random.nextFloat() * 0.7f + 0.1f,
+                speed = Random.nextFloat() * 0.0005f + 0.0002f,
+                radius = Random.nextFloat() * 4f + 2f,
+                alpha = Random.nextFloat(),
+                pulseSpeed = Random.nextFloat() * 0.05f + 0.02f,
+                driftX = Random.nextFloat() * 0.001f - 0.0005f,
+            )
+        }.toMutableList()
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16L)
+            frameTime++
+            fireflies.forEach { f ->
+                f.y -= f.speed
+                f.x += f.driftX + sin(frameTime * 0.02f) * 0.0003f
+                f.alpha = (sin(frameTime * f.pulseSpeed) * 0.5f + 0.5f).coerceIn(0.1f, 0.9f)
+                if (f.y < -0.05f) { f.y = 1.05f; f.x = Random.nextFloat() }
+                if (f.x < -0.05f) f.x = 1.05f
+                if (f.x > 1.05f) f.x = -0.05f
+            }
+        }
+    }
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        fireflies.forEach { f ->
+            // 外层光晕
+            drawCircle(
+                color = Color(0xFFFFE082).copy(alpha = f.alpha * 0.3f),
+                radius = f.radius * 3f,
+                center = Offset(f.x * w, f.y * h),
+            )
+            // 核心亮点
+            drawCircle(
+                color = Color(0xFFFFF8E1).copy(alpha = f.alpha * 0.8f),
+                radius = f.radius,
+                center = Offset(f.x * w, f.y * h),
             )
         }
     }
 }
 
 // ═════════════════════════════════════════════
-// ☁️ 多云：多层云视差漂移
+// ☁️ 多云：蓬松积云（宫崎骏式多圆组合）
 // ═════════════════════════════════════════════
 
-private data class CloudLayer(
+private data class GhibliCloud(
     var x: Float,
     val y: Float,
-    val speed: Float,       // 不同层速度不同 → 视差
-    val width: Float,
-    val height: Float,
+    val speed: Float,
+    val scale: Float,
     val alpha: Float,
-    val cornerRatio: Float, // 圆角比例
 )
 
 @Composable
-private fun CloudEffect(modifier: Modifier = Modifier) {
+private fun GhibliCloudEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
-    // 3 层云，速度不同产生视差
     val clouds = remember {
         listOf(
-            // 远景层
-            CloudLayer(x = -0.1f, y = 0.04f, speed = 0.00018f, width = 0.50f, height = 0.07f, alpha = 0.25f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.5f, y = 0.08f, speed = 0.00015f, width = 0.60f, height = 0.08f, alpha = 0.20f, cornerRatio = 0.5f),
-            // 中景层
-            CloudLayer(x = 0.1f, y = 0.16f, speed = 0.00035f, width = 0.40f, height = 0.06f, alpha = 0.35f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.7f, y = 0.22f, speed = 0.00030f, width = 0.35f, height = 0.055f, alpha = 0.30f, cornerRatio = 0.5f),
-            // 近景层
-            CloudLayer(x = -0.2f, y = 0.30f, speed = 0.00055f, width = 0.30f, height = 0.05f, alpha = 0.40f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.4f, y = 0.35f, speed = 0.00050f, width = 0.25f, height = 0.045f, alpha = 0.35f, cornerRatio = 0.5f),
-            CloudLayer(x = 0.9f, y = 0.13f, speed = 0.00045f, width = 0.32f, height = 0.05f, alpha = 0.28f, cornerRatio = 0.5f),
+            GhibliCloud(x = -0.1f, y = 0.05f, speed = 0.00012f, scale = 1.2f, alpha = 0.25f),
+            GhibliCloud(x = 0.4f, y = 0.12f, speed = 0.00018f, scale = 0.9f, alpha = 0.30f),
+            GhibliCloud(x = 0.8f, y = 0.08f, speed = 0.00015f, scale = 1.0f, alpha = 0.20f),
+            GhibliCloud(x = 0.2f, y = 0.22f, speed = 0.00025f, scale = 0.7f, alpha = 0.35f),
+            GhibliCloud(x = 0.6f, y = 0.28f, speed = 0.00030f, scale = 0.6f, alpha = 0.30f),
         ).toMutableList()
     }
 
@@ -199,9 +229,9 @@ private fun CloudEffect(modifier: Modifier = Modifier) {
         while (true) {
             delay(16L)
             frameTime++
-            clouds.forEach { cloud ->
-                cloud.x += cloud.speed
-                if (cloud.x > 1.2f) cloud.x = -cloud.width - 0.1f
+            clouds.forEach { c ->
+                c.x += c.speed
+                if (c.x > 1.3f) c.x = -0.4f
             }
         }
     }
@@ -210,36 +240,58 @@ private fun CloudEffect(modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         clouds.forEach { cloud ->
-            drawOval(
-                color = Color.White.copy(alpha = cloud.alpha),
-                topLeft = Offset(cloud.x * w, cloud.y * h),
-                size = Size(cloud.width * w, cloud.height * h),
+            drawGhibliCloud(
+                center = Offset(cloud.x * w, cloud.y * h),
+                scale = cloud.scale * w * 0.15f,
+                alpha = cloud.alpha,
             )
         }
     }
 }
 
+/** 绘制蓬松积云：多个圆形组合成自然的云朵形状 */
+private fun DrawScope.drawGhibliCloud(center: Offset, scale: Float, alpha: Float) {
+    val color = Color.White.copy(alpha = alpha)
+    // 底部大圆
+    drawCircle(color, radius = scale, center = center)
+    // 上方隆起
+    drawCircle(color, radius = scale * 0.75f, center = Offset(center.x - scale * 0.5f, center.y - scale * 0.3f))
+    drawCircle(color, radius = scale * 0.85f, center = Offset(center.x + scale * 0.2f, center.y - scale * 0.45f))
+    drawCircle(color, radius = scale * 0.6f, center = Offset(center.x + scale * 0.7f, center.y - scale * 0.15f))
+    // 左右延伸
+    drawCircle(color, radius = scale * 0.65f, center = Offset(center.x - scale * 0.9f, center.y + scale * 0.1f))
+    drawCircle(color, radius = scale * 0.55f, center = Offset(center.x + scale * 1.0f, center.y + scale * 0.1f))
+}
+
 // ═════════════════════════════════════════════
-// 🌧 雨天：多层雨滴 + 速度/透明度变化
+// 🌧 雨天：手绘感雨滴（带弧度和不规则）
 // ═════════════════════════════════════════════
 
-private data class RainDrop(
+private data class GhibliRainDrop(
     var x: Float,
     var y: Float,
     val speed: Float,
     val length: Float,
     val alpha: Float,
-    val angle: Float,
-    val strokeWidth: Float,
+    val curve: Float,  // 弧度，让雨滴有手绘感
+    val thickness: Float,
 )
 
 @Composable
-private fun RainEffect(modifier: Modifier = Modifier, intensity: Int = 100) {
+private fun GhibliRainEffect(modifier: Modifier = Modifier, intensity: Int = 80) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
     val drops = remember {
         List(intensity) {
-            createRainDrop()
+            GhibliRainDrop(
+                x = Random.nextFloat(),
+                y = Random.nextFloat() * 1.2f - 0.1f,
+                speed = Random.nextFloat() * 0.015f + 0.012f,
+                length = Random.nextFloat() * 0.04f + 0.02f,
+                alpha = Random.nextFloat() * 0.4f + 0.2f,
+                curve = Random.nextFloat() * 0.008f - 0.004f,
+                thickness = Random.nextFloat() * 1.5f + 1f,
+            )
         }.toMutableList()
     }
 
@@ -249,12 +301,11 @@ private fun RainEffect(modifier: Modifier = Modifier, intensity: Int = 100) {
             frameTime++
             drops.forEach { drop ->
                 drop.y += drop.speed
-                drop.x += drop.angle * drop.speed * 0.5f
-                if (drop.y > 1.15f) {
-                    drop.y = Random.nextFloat() * -0.2f - 0.05f
+                drop.x += 0.001f  // 微微斜向
+                if (drop.y > 1.1f) {
+                    drop.y = Random.nextFloat() * -0.15f
                     drop.x = Random.nextFloat()
                 }
-                if (drop.x > 1.1f) drop.x = -0.05f
             }
         }
     }
@@ -265,59 +316,55 @@ private fun RainEffect(modifier: Modifier = Modifier, intensity: Int = 100) {
         drops.forEach { drop ->
             val startX = drop.x * w
             val startY = drop.y * h
-            val endX = startX + drop.angle * drop.length * h
             val endY = startY + drop.length * h
-            drawLine(
+            // 带弧度的雨滴（贝塞尔曲线感）
+            val path = Path().apply {
+                moveTo(startX, startY)
+                quadraticBezierTo(
+                    startX + drop.curve * w, (startY + endY) / 2,
+                    startX + drop.curve * w * 2, endY,
+                )
+            }
+            drawPath(
+                path = path,
                 color = Color.White.copy(alpha = drop.alpha),
-                start = Offset(startX, startY),
-                end = Offset(endX, endY),
-                strokeWidth = drop.strokeWidth,
-                cap = StrokeCap.Round,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = drop.thickness,
+                    cap = StrokeCap.Round,
+                ),
             )
         }
     }
 }
 
-private fun createRainDrop() = RainDrop(
-    x = Random.nextFloat(),
-    y = Random.nextFloat() * 1.2f - 0.1f,
-    speed = Random.nextFloat() * 0.018f + 0.012f,
-    length = Random.nextFloat() * 0.06f + 0.025f,
-    alpha = Random.nextFloat() * 0.4f + 0.3f,
-    angle = Random.nextFloat() * 0.12f + 0.04f,
-    strokeWidth = Random.nextFloat() * 1.5f + 1.2f,
-)
-
 // ═════════════════════════════════════════════
-// 🌨 雪天：多层雪花 + 左右摆动
+// 🌨 雪天：大小不一的雪花 + 轻柔飘落
 // ═════════════════════════════════════════════
 
-private data class Snowflake(
+private data class GhibliSnowflake(
     var x: Float,
     var y: Float,
     val speed: Float,
     val radius: Float,
     val alpha: Float,
-    val swayAmplitude: Float,
-    val swayFrequency: Float,
-    val phase: Float,
+    val swayPhase: Float,
+    val swayAmp: Float,
 )
 
 @Composable
-private fun SnowEffect(modifier: Modifier = Modifier) {
+private fun GhibliSnowEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
     val flakes = remember {
-        List(100) {
-            Snowflake(
+        List(80) {
+            GhibliSnowflake(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
-                speed = Random.nextFloat() * 0.004f + 0.001f,
+                speed = Random.nextFloat() * 0.003f + 0.001f,
                 radius = Random.nextFloat() * 5f + 2f,
-                alpha = Random.nextFloat() * 0.5f + 0.4f,
-                swayAmplitude = Random.nextFloat() * 0.02f + 0.005f,
-                swayFrequency = Random.nextFloat() * 0.04f + 0.015f,
-                phase = Random.nextFloat() * 2f * PI.toFloat(),
+                alpha = Random.nextFloat() * 0.5f + 0.3f,
+                swayPhase = Random.nextFloat() * PI.toFloat() * 2,
+                swayAmp = Random.nextFloat() * 0.015f + 0.005f,
             )
         }.toMutableList()
     }
@@ -326,15 +373,10 @@ private fun SnowEffect(modifier: Modifier = Modifier) {
         while (true) {
             delay(16L)
             frameTime++
-            flakes.forEach { flake ->
-                flake.y += flake.speed
-                flake.x += sin(frameTime * flake.swayFrequency + flake.phase) * flake.swayAmplitude * 0.08f
-                if (flake.y > 1.05f) {
-                    flake.y = -0.03f
-                    flake.x = Random.nextFloat()
-                }
-                if (flake.x < -0.05f) flake.x = 1.05f
-                if (flake.x > 1.05f) flake.x = -0.05f
+            flakes.forEach { f ->
+                f.y += f.speed
+                f.x += sin(frameTime * 0.015f + f.swayPhase) * f.swayAmp * 0.05f
+                if (f.y > 1.05f) { f.y = -0.05f; f.x = Random.nextFloat() }
             }
         }
     }
@@ -342,11 +384,18 @@ private fun SnowEffect(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        flakes.forEach { flake ->
+        flakes.forEach { f ->
+            // 柔和光晕
             drawCircle(
-                color = Color.White.copy(alpha = flake.alpha),
-                radius = flake.radius,
-                center = Offset(flake.x * w, flake.y * h),
+                color = Color.White.copy(alpha = f.alpha * 0.3f),
+                radius = f.radius * 2f,
+                center = Offset(f.x * w, f.y * h),
+            )
+            // 雪花核心
+            drawCircle(
+                color = Color.White.copy(alpha = f.alpha),
+                radius = f.radius,
+                center = Offset(f.x * w, f.y * h),
             )
         }
     }
@@ -357,39 +406,36 @@ private fun SnowEffect(modifier: Modifier = Modifier) {
 // ═════════════════════════════════════════════
 
 @Composable
-private fun StormEffect(modifier: Modifier = Modifier) {
-    // 密集雨层
-    RainEffect(modifier = modifier, intensity = 120)
+private fun GhibliStormEffect(modifier: Modifier = Modifier) {
+    GhibliRainEffect(modifier = modifier, intensity = 120)
 
-    // 闪电层
     val flashAlpha = remember { mutableListOf(0f) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(Random.nextLong(2000, 5000))
-            // 双闪
-            flashAlpha[0] = 0.35f
-            delay(70)
+            delay(Random.nextLong(3000, 7000))
+            flashAlpha[0] = 0.3f
+            delay(60)
             flashAlpha[0] = 0f
-            delay(90)
-            flashAlpha[0] = 0.18f
-            delay(50)
+            delay(100)
+            flashAlpha[0] = 0.15f
+            delay(40)
             flashAlpha[0] = 0f
         }
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
         if (flashAlpha[0] > 0f) {
-            drawRect(color = Color.White.copy(alpha = flashAlpha[0]))
+            drawRect(color = Color(0xFFFFF8E1).copy(alpha = flashAlpha[0]))
         }
     }
 }
 
 // ═════════════════════════════════════════════
-// 🌫 雾天：多层雾带缓慢漂移
+// 🌫 雾天：层叠薄雾缓慢流动
 // ═════════════════════════════════════════════
 
-private data class FogBand(
+private data class GhibliFogLayer(
     var x: Float,
     val y: Float,
     val speed: Float,
@@ -399,18 +445,18 @@ private data class FogBand(
 )
 
 @Composable
-private fun FogEffect(modifier: Modifier = Modifier) {
+private fun GhibliFogEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
-    val bands = remember {
-        List(10) {
-            FogBand(
+    val layers = remember {
+        List(8) {
+            GhibliFogLayer(
                 x = Random.nextFloat() * 1.5f - 0.5f,
-                y = Random.nextFloat() * 0.7f + 0.15f,
-                speed = Random.nextFloat() * 0.0003f + 0.0001f,
-                width = Random.nextFloat() * 0.7f + 0.5f,
-                height = Random.nextFloat() * 0.12f + 0.05f,
-                alpha = Random.nextFloat() * 0.15f + 0.1f,
+                y = Random.nextFloat() * 0.6f + 0.2f,
+                speed = Random.nextFloat() * 0.0002f + 0.00005f,
+                width = Random.nextFloat() * 0.6f + 0.4f,
+                height = Random.nextFloat() * 0.08f + 0.04f,
+                alpha = Random.nextFloat() * 0.12f + 0.05f,
             )
         }.toMutableList()
     }
@@ -419,9 +465,9 @@ private fun FogEffect(modifier: Modifier = Modifier) {
         while (true) {
             delay(16L)
             frameTime++
-            bands.forEach { band ->
-                band.x += band.speed
-                if (band.x > 1.2f) band.x = -band.width - 0.1f
+            layers.forEach { l ->
+                l.x += l.speed
+                if (l.x > 1.3f) l.x = -l.width - 0.1f
             }
         }
     }
@@ -429,12 +475,97 @@ private fun FogEffect(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        bands.forEach { band ->
+        layers.forEach { l ->
             drawOval(
-                color = Color.White.copy(alpha = band.alpha),
-                topLeft = Offset(band.x * w, band.y * h),
-                size = Size(band.width * w, band.height * h),
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = l.alpha),
+                        Color.White.copy(alpha = l.alpha),
+                        Color.Transparent,
+                    ),
+                ),
+                topLeft = Offset(l.x * w, l.y * h),
+                size = Size(l.width * w, l.height * h),
             )
+        }
+    }
+}
+
+// ═════════════════════════════════════════════
+// 🌸 季节性飘落物（花瓣/树叶）
+// ═════════════════════════════════════════════
+
+private data class FloatingPetal(
+    var x: Float,
+    var y: Float,
+    val speed: Float,
+    val size: Float,
+    val rotation: Float,
+    val rotationSpeed: Float,
+    val alpha: Float,
+    val color: Color,
+)
+
+@Composable
+private fun SeasonalParticles(modifier: Modifier = Modifier) {
+    var frameTime by remember { mutableLongStateOf(0L) }
+
+    // 根据月份选择颜色（春=粉色花瓣，夏=绿叶，秋=红叶，冬=无）
+    val month = java.time.LocalDate.now().monthValue
+    val particleColor = when (month) {
+        in 3..5 -> Color(0xFFFFB7C5)   // 春：樱花粉
+        in 6..8 -> Color(0xFFA5D6A7)   // 夏：嫩绿
+        in 9..11 -> Color(0xFFFFCC80)  // 秋：金黄
+        else -> return  // 冬天不飘落
+    }
+
+    val petals = remember {
+        List(12) {
+            FloatingPetal(
+                x = Random.nextFloat(),
+                y = Random.nextFloat() * -0.5f - 0.1f,
+                speed = Random.nextFloat() * 0.002f + 0.0008f,
+                size = Random.nextFloat() * 8f + 4f,
+                rotation = Random.nextFloat() * 360f,
+                rotationSpeed = Random.nextFloat() * 2f - 1f,
+                alpha = Random.nextFloat() * 0.4f + 0.2f,
+                color = particleColor,
+            )
+        }.toMutableList()
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16L)
+            frameTime++
+            petals.forEach { p ->
+                p.y += p.speed
+                p.x += sin(frameTime * 0.01f + p.rotation) * 0.001f
+                if (p.y > 1.1f) {
+                    p.y = -0.1f
+                    p.x = Random.nextFloat()
+                }
+            }
+        }
+    }
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        petals.forEach { p ->
+            val cx = p.x * w
+            val cy = p.y * h
+            val angle = (frameTime * p.rotationSpeed + p.rotation) % 360f
+
+            rotate(degrees = angle, pivot = Offset(cx, cy)) {
+                // 花瓣/叶子形状（椭圆）
+                drawOval(
+                    color = p.color.copy(alpha = p.alpha),
+                    topLeft = Offset(cx - p.size, cy - p.size * 0.5f),
+                    size = Size(p.size * 2f, p.size),
+                )
+            }
         }
     }
 }
