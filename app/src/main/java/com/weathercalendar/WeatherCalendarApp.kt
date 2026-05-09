@@ -1,6 +1,7 @@
 package com.weathercalendar
 
 import android.app.Application
+import com.weathercalendar.notification.EventReminderScheduler
 import com.weathercalendar.notification.WeatherNotificationWorker
 import com.weathercalendar.widget.WeatherWidgetWorker
 import com.weathercalendar.widget.WidgetRefreshWorker
@@ -17,5 +18,7 @@ class WeatherCalendarApp : Application() {
         WidgetRefreshWorker.enqueue(this)
         // 天气通知定时检查（每 6 小时）
         WeatherNotificationWorker.enqueue(this)
+        // 恢复所有日程提醒（含重复事件未来 7 天）
+        EventReminderScheduler.rescheduleAll(this)
     }
 }

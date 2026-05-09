@@ -110,8 +110,8 @@ class EventRepository @Inject constructor(
 
     /** 删除事件 */
     suspend fun deleteEvent(id: Long) {
-        EventReminderWorker.cancel(context, id)
-        eventDao.deleteById(id)
+        eventDao.deleteById(id)  // DB first (source of truth)
+        EventReminderWorker.cancel(context, id)  // Then cancel alarm
     }
 
     /** 观察所有事件（Flow） */

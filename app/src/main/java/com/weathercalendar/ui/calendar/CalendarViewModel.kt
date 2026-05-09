@@ -49,7 +49,7 @@ class CalendarViewModel @Inject constructor(
 
     // 缓存已加载的月份数据，最多保留 6 个月避免内存增长
     private val monthCache = ConcurrentHashMap<YearMonth, MonthData>()
-    private val cacheOrder = mutableListOf<YearMonth>()
+    private val cacheOrder = java.util.Collections.synchronizedList(mutableListOf<YearMonth>())
     private val maxCacheSize = 6
 
     // 缓存坐标，避免每次切月都重新定位
@@ -211,17 +211,17 @@ class CalendarViewModel @Inject constructor(
 
     // ── 事件 CRUD ──
 
-    fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50) {
+    fun addEvent(title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50, recurrenceRule: String? = null) {
         viewModelScope.launch {
-            eventRepository.addEvent(title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, color = color)
+            eventRepository.addEvent(title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, recurrenceRule = recurrenceRule, color = color)
             monthCache.clear()
             loadMonth(_uiState.value.currentMonth)
         }
     }
 
-    fun updateEvent(id: Long, title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50) {
+    fun updateEvent(id: Long, title: String, date: java.time.LocalDate, time: java.time.LocalTime? = null, description: String = "", reminderMinutes: Int? = null, color: Long = 0xFF4CAF50, recurrenceRule: String? = null) {
         viewModelScope.launch {
-            eventRepository.updateEvent(id = id, title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, color = color)
+            eventRepository.updateEvent(id = id, title = title, date = date, time = time, description = description, reminderMinutes = reminderMinutes, recurrenceRule = recurrenceRule, color = color)
             monthCache.clear()
             loadMonth(_uiState.value.currentMonth)
         }

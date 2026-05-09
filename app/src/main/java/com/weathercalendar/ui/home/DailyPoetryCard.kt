@@ -52,28 +52,29 @@ fun DailyPoetryCard(
         // 精华一句
         Text(
             text = "「${poetry.verse}」",
-            fontSize = 16.sp,
-            color = Color(0xFFE8D5B7),
+            fontSize = 18.sp,
+            color = Color(0xFFF5E6C8),
             textAlign = TextAlign.Center,
             fontFamily = FontFamily.Serif,
-            lineHeight = 26.sp,
-            letterSpacing = 0.8.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 30.sp,
+            letterSpacing = 1.sp,
         )
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             text = "— ${poetry.source}",
-            fontSize = 13.sp,
-            color = Color(0xFFE8D5B7).copy(alpha = 0.6f),
+            fontSize = 14.sp,
+            color = Color(0xFFD4A574),
             fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.Light,
+            fontWeight = FontWeight.Normal,
         )
 
         // 展开提示
         if (hasFullText && !expanded) {
             Text(
                 text = "点击查看全文 ▾",
-                fontSize = 11.sp,
-                color = Color(0xFFE8D5B7).copy(alpha = 0.4f),
+                fontSize = 12.sp,
+                color = Color(0xFFD4A574).copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -89,7 +90,7 @@ fun DailyPoetryCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HorizontalDivider(
-                    color = Color(0xFFE8D5B7).copy(alpha = 0.2f),
+                    color = Color(0xFFD4A574).copy(alpha = 0.3f),
                     modifier = Modifier.padding(horizontal = 40.dp),
                 )
                 Spacer(Modifier.height(12.dp))
@@ -97,16 +98,16 @@ fun DailyPoetryCard(
                 // 诗名
                 Text(
                     text = poetry.source.substringBefore("·"),
-                    fontSize = 15.sp,
-                    color = Color(0xFFE8D5B7).copy(alpha = 0.8f),
+                    fontSize = 16.sp,
+                    color = Color(0xFFF5E6C8),
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.SemiBold,
                 )
                 // 作者
                 Text(
                     text = poetry.source.substringAfter("·", ""),
-                    fontSize = 12.sp,
-                    color = Color(0xFFE8D5B7).copy(alpha = 0.5f),
+                    fontSize = 13.sp,
+                    color = Color(0xFFD4A574),
                     fontFamily = FontFamily.Serif,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -114,19 +115,19 @@ fun DailyPoetryCard(
                 // 全文
                 Text(
                     text = poetry.fullText,
-                    fontSize = 15.sp,
-                    color = Color(0xFFE8D5B7).copy(alpha = 0.9f),
+                    fontSize = 16.sp,
+                    color = Color(0xFFF5E6C8).copy(alpha = 0.95f),
                     fontFamily = FontFamily.Serif,
                     textAlign = TextAlign.Center,
-                    lineHeight = 28.sp,
-                    letterSpacing = 0.5.sp,
+                    lineHeight = 30.sp,
+                    letterSpacing = 0.6.sp,
                 )
 
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = "▴ 收起",
-                    fontSize = 11.sp,
-                    color = Color(0xFFE8D5B7).copy(alpha = 0.4f),
+                    fontSize = 12.sp,
+                    color = Color(0xFFD4A574).copy(alpha = 0.6f),
                 )
             }
         }

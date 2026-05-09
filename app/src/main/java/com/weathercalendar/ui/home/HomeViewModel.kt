@@ -166,20 +166,30 @@ class HomeViewModel @Inject constructor(
         if (loc == null) {
             val failReason = locResult.exceptionOrNull()?.message ?: "未知原因"
             android.util.Log.w("HomeViewModel", "定位失败: $failReason")
-            // 如果有缓存位置，用缓存；否则报错
+            // 如果有缓存位置，用缓存；否则用默认城市
             val cachedLat = sp.getString("widget_city_lat", null)?.toDoubleOrNull()
             val cachedLon = sp.getString("widget_city_lon", null)?.toDoubleOrNull()
             val cachedCity = sp.getString("widget_city_name", null)
+
+            val lat: Double
+            val lon: Double
+            val city: String
+
             if (cachedLat != null && cachedLon != null && cachedCity != null) {
-                _uiState.update { it.copy(cityName = cachedCity) }
-                val result = weatherRepository.getWeather(cachedLat, cachedLon, forceRefresh = forceRefresh)
-                result.getOrNull()?.let { data ->
-                    freshDataLoaded = true
-                    renderWeatherData(data, today, userPrefs)
-                } ?: _uiState.update { it.copy(isLoading = false, error = "天气加载失败") }
+                lat = cachedLat; lon = cachedLon; city = cachedCity
             } else {
-                _uiState.update { it.copy(isLoading = false, error = "定位失败: $failReason") }
+                // 使用默认城市（设置中可配置）
+                lat = userPrefs.defaultCityLat
+                lon = userPrefs.defaultCityLon
+                city = userPrefs.defaultCityName
             }
+
+            _uiState.update { it.copy(cityName = city) }
+            val result = weatherRepository.getWeather(lat, lon, forceRefresh = forceRefresh)
+            result.getOrNull()?.let { data ->
+                freshDataLoaded = true
+                renderWeatherData(data, today, userPrefs)
+            } ?: _uiState.update { it.copy(isLoading = false, error = "天气加载失败，请检查网络") }
             return
         }
 

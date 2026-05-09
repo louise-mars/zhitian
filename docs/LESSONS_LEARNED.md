@@ -340,3 +340,67 @@ if (airQuality != null) {
 ### 教训
 
 集成第三方 API 时，必须确认免费版包含哪些端点。不要假设所有文档中列出的 API 都可用。对于付费功能，UI 应该优雅降级（隐藏）而不是显示错误状态。
+
+
+---
+
+## 16. AlarmManager vs WorkManager 用于定时提醒
+
+### 问题
+
+WorkManager 的 `OneTimeWorkRequest` + `setInitialDelay` 不适合精确定时提醒：
+- Doze 模式下可能延迟数分钟
+- 长延迟（1天/1周）可能被系统清理
+- 不保证精确到分钟级触发
+
+### 解决方案
+
+改用 `AlarmManager.setExactAndAllowWhileIdle`：
+- 精确到分钟级触发
+- Doze 模式下也能工作
+- 配合 `BOOT_COMPLETED` BroadcastReceiver 在重启后恢复
+
+### 完整架构
+
+```
+用户创建事件 → EventReminderScheduler.schedule()
+    → AlarmManager.setExactAndAllowWhileIdle(triggerMillis, PendingIntent)
+
+闹钟触发 → EventReminderReceiver.onReceive()
+    → 发送高优先级通知
+
+设备重启 → BootCompletedReceiver.onReceive()
+    → EventReminderScheduler.rescheduleAll()
+    → 查询 Room 数据库，重新安排未来 7 天的所有闹钟
+
+App 启动 → WeatherCalendarApp.onCreate()
+    → EventReminderScheduler.rescheduleAll()
+    → 确保重复事件的未来实例也有闹钟
+```
+
+### 注意事项
+
+- Android 12+ 需要 `SCHEDULE_EXACT_ALARM` 权限（日历类 app 用 `USE_EXACT_ALARM` 自动获得）
+- Force-stop 会取消所有闹钟（Android 系统限制，无法绕过）
+- 重复事件需要定期重新安排（每次 App 启动时安排未来 7 天）
+
+---
+
+## 17. 定位失败时的 Fallback 策略
+
+### 问题
+
+用户拒绝定位权限后，如果没有缓存位置，app 显示"定位失败"错误页面，用户被锁死在重试循环中。
+
+### 解决方案
+
+Fallback 链：
+1. GPS 定位（高德 SDK）
+2. SharedPreferences 缓存的上次位置
+3. **UserPrefs 中的默认城市**（设置页可配置）
+
+永远不会显示"定位失败"错误——最差情况下用默认城市（北京）的天气。
+
+### 教训
+
+任何依赖外部服务（GPS、网络）的功能都必须有本地 fallback。用户不应该因为一个可选功能（精确定位）的失败而无法使用核心功能（看天气）。

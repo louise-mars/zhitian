@@ -135,9 +135,9 @@ fun WeatherCalendarNavHost() {
                 onBack = { navController.popBackStack() },
                 onPrevMonth = { viewModel.changeMonth(-1) },
                 onNextMonth = { viewModel.changeMonth(1) },
-                onAddEvent = { date, title, description, time, reminder, color -> viewModel.addEvent(title, date, time, description, reminder, color) },
+                onAddEvent = { date, title, description, time, reminder, color, recurrence -> viewModel.addEvent(title, date, time, description, reminder, color, recurrence) },
                 onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
-                onUpdateEvent = { id, date, title, description, time, reminder, color -> viewModel.updateEvent(id, title, date, time, description, reminder, color) },
+                onUpdateEvent = { id, date, title, description, time, reminder, color, recurrence -> viewModel.updateEvent(id, title, date, time, description, reminder, color, recurrence) },
             )
         }
 

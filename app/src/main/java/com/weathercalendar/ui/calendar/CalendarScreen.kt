@@ -89,9 +89,9 @@ fun CalendarScreen(
     onBack: () -> Unit = {},
     onPrevMonth: () -> Unit = {},
     onNextMonth: () -> Unit = {},
-    onAddEvent: (LocalDate, String, String, java.time.LocalTime?, Int?, Long) -> Unit = { _, _, _, _, _, _ -> },
+    onAddEvent: (LocalDate, String, String, java.time.LocalTime?, Int?, Long, String?) -> Unit = { _, _, _, _, _, _, _ -> },
     onDeleteEvent: (Long) -> Unit = {},
-    onUpdateEvent: (Long, LocalDate, String, String, java.time.LocalTime?, Int?, Long) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdateEvent: (Long, LocalDate, String, String, java.time.LocalTime?, Int?, Long, String?) -> Unit = { _, _, _, _, _, _, _, _ -> },
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -236,16 +236,16 @@ fun CalendarScreen(
                     weatherCondition = todayWeather?.get(selectedDate)?.first,
                     tempRange = todayWeather?.get(selectedDate)?.second,
                     events = currentEvents,
-                    onAddEvent = { title, description, time, reminderMinutes, color ->
-                        onAddEvent(selectedDate!!, title, description, time, reminderMinutes, color)
+                    onAddEvent = { title, description, time, reminderMinutes, color, recurrence ->
+                        onAddEvent(selectedDate!!, title, description, time, reminderMinutes, color, recurrence)
                         feedbackMessage = "✓ 已添加"
                     },
                     onDeleteEvent = { id ->
                         onDeleteEvent(id)
                         feedbackMessage = "✓ 已删除"
                     },
-                    onUpdateEvent = { id, title, description, time, reminderMinutes, color ->
-                        onUpdateEvent(id, selectedDate!!, title, description, time, reminderMinutes, color)
+                    onUpdateEvent = { id, title, description, time, reminderMinutes, color, recurrence ->
+                        onUpdateEvent(id, selectedDate!!, title, description, time, reminderMinutes, color, recurrence)
                         feedbackMessage = "✓ 已更新"
                     },
                 )
@@ -519,9 +519,9 @@ private fun DayDetailContent(
     holidays: List<Holidays.HolidayInfo>,
     weatherCondition: WeatherCondition?, tempRange: Pair<Int, Int>?,
     events: List<CalendarEvent>,
-    onAddEvent: (String, String, java.time.LocalTime?, Int?, Long) -> Unit,
+    onAddEvent: (String, String, java.time.LocalTime?, Int?, Long, String?) -> Unit,
     onDeleteEvent: (Long) -> Unit,
-    onUpdateEvent: (Long, String, String, java.time.LocalTime?, Int?, Long) -> Unit,
+    onUpdateEvent: (Long, String, String, java.time.LocalTime?, Int?, Long, String?) -> Unit,
 ) {
     var showAddForm by remember { mutableStateOf(events.isEmpty()) }
     var newTitle by rememberSaveable { mutableStateOf("") }
@@ -752,6 +752,44 @@ private fun DayDetailContent(
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+
+            // 重复规则
+            var showRecurrenceMenu by remember { mutableStateOf(false) }
+            var newRecurrence by remember { mutableStateOf<String?>(null) }
+            val recurrenceOptions = listOf(
+                null to "不重复",
+                "daily" to "每天",
+                "weekly" to "每周",
+                "monthly" to "每月",
+                "yearly" to "每年",
+            )
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showRecurrenceMenu = true }
+                        .padding(vertical = 8.dp),
+                ) {
+                    Text("🔁 ", fontSize = 14.sp)
+                    val recLabel = recurrenceOptions.find { it.first == newRecurrence }?.second ?: "不重复"
+                    Text(recLabel, fontSize = 14.sp, color = Color.White)
+                    Text(" ▾", fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+                }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = showRecurrenceMenu,
+                    onDismissRequest = { showRecurrenceMenu = false },
+                ) {
+                    recurrenceOptions.forEach { (rule, label) ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = { newRecurrence = rule; showRecurrenceMenu = false },
+                            leadingIcon = { if (newRecurrence == rule) Text("✓", fontSize = 14.sp) },
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
 
             // 确定按钮
@@ -772,10 +810,10 @@ private fun DayDetailContent(
                             if (h in 0..23 && m in 0..59) java.time.LocalTime.of(h, m) else null
                         } else null
                         if (editingId != null) {
-                            onUpdateEvent(editingId!!, trimmed, newDescription.trim(), time, newReminder, newColor)
+                            onUpdateEvent(editingId!!, trimmed, newDescription.trim(), time, newReminder, newColor, newRecurrence)
                             editingId = null
                         } else {
-                            onAddEvent(trimmed, newDescription.trim(), time, newReminder, newColor)
+                            onAddEvent(trimmed, newDescription.trim(), time, newReminder, newColor, newRecurrence)
                         }
                         newTitle = ""; newDescription = ""; newHour = ""; newMinute = ""; newReminder = null; newColor = 0xFF4CAF50L
                         showAddForm = false
