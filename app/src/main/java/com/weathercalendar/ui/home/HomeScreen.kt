@@ -319,12 +319,14 @@ fun HomeScreen(
                             exit = shrinkVertically(),
                         ) {
                             Column {
-                                AqiCard(
-                                    airQuality = airQuality,
-                                    textColor = textColor,
-                                    modifier = Modifier.padding(horizontal = 20.dp),
-                                )
-                                Spacer(Modifier.height(12.dp))
+                                if (airQuality != null) {
+                                    AqiCard(
+                                        airQuality = airQuality,
+                                        textColor = textColor,
+                                        modifier = Modifier.padding(horizontal = 20.dp),
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                }
                                 LifeIndexCard(
                                     currentWeather = currentWeather, todayInfo = threeDays.firstOrNull(),
                                     windSpeed = weatherDetails.windSpeed, textColor = textColor,

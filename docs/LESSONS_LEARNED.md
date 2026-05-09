@@ -313,3 +313,30 @@ var newTitle by rememberSaveable { mutableStateOf("") }
 ### 适用场景
 
 任何嵌套在可拖拽容器（BottomSheet、Drawer、ViewPager）中的交互，都应该避免依赖滑动手势。改用点击操作。
+
+
+---
+
+## 15. 和风天气免费版 API 权限限制
+
+### 问题
+
+空气质量 API (`/v7/air/now`) 返回 403 Forbidden："No permission to request this data"。
+
+### 根因
+
+和风天气免费开发版订阅不包含空气质量数据权限。这不是代码 bug，是 API 套餐限制。
+
+### 解决方案
+
+当 API 返回 403 或数据为 null 时，**直接隐藏 AQI 卡片**，而不是显示"暂无数据"。用户不需要看到一个永远无数据的空卡片。
+
+```kotlin
+if (airQuality != null) {
+    AqiCard(airQuality = airQuality, ...)
+}
+```
+
+### 教训
+
+集成第三方 API 时，必须确认免费版包含哪些端点。不要假设所有文档中列出的 API 都可用。对于付费功能，UI 应该优雅降级（隐藏）而不是显示错误状态。
