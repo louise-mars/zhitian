@@ -303,8 +303,15 @@ class HomeViewModel @Inject constructor(
         // 生成日程天气预警（异步，不阻塞 UI 渲染）
         viewModelScope.launch {
             try {
-                val alerts = alertEngine.generateAlerts(weatherData.daily)
+                val alerts = alertEngine.generateAlerts(
+                    dailyForecasts = weatherData.daily,
+                    hourlyForecasts = weatherData.hourly,
+                    warnings = weatherData.warnings,
+                )
                 _uiState.update { it.copy(weatherAlerts = alerts) }
+
+                // 推送本地通知（明天/后天的预警，每天最多 1 条）
+                com.weathercalendar.notification.WeatherAlertNotifier.checkAndNotify(appContext, alerts)
             } catch (_: Exception) {
                 // 预警生成失败不影响主流程
             }
