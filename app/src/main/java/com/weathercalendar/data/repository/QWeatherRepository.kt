@@ -142,6 +142,7 @@ class QWeatherRepository @Inject constructor(
                         tempMin = d.tempMin.toIntOrNull() ?: 0,
                         tempMax = d.tempMax.toIntOrNull() ?: 0,
                         windSpeed = d.windSpeed.toIntOrNull() ?: 0,
+                        precip = d.precip.toDoubleOrNull() ?: 0.0,
                     )
                 }
 

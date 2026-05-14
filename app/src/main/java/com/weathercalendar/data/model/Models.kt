@@ -46,6 +46,7 @@ data class DailyWeather(
     val tempMin: Int,
     val tempMax: Int,
     val windSpeed: Int = 0,  // 每日最大风速 km/h
+    val precip: Double = 0.0,  // 当天总降水量 mm
 )
 
 /** 详细气象指标 */

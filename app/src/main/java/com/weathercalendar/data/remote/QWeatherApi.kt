@@ -140,6 +140,7 @@ data class QWeatherDaily(
     val sunrise: String = "",   // "06:12"
     val sunset: String = "",    // "18:45"
     @SerialName("windSpeedDay") val windSpeed: String = "0",
+    val precip: String = "0",   // 当天总降水量 mm
 )
 
 @Serializable

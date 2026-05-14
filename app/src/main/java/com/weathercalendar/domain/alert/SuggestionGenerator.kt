@@ -23,6 +23,6 @@ object SuggestionGenerator {
         is BadWeatherCondition.Rainy -> "建议带伞或调整出行时间"
         is BadWeatherCondition.StrongWind -> "注意防风，避免高空作业或户外活动"
         is BadWeatherCondition.ExtremeHeat -> "注意防暑降温，避免长时间户外活动"
-        is BadWeatherCondition.ExtremeCold -> "注意防寒保暖"
+        is BadWeatherCondition.ExtremeCold -> "注意防寒保暖，路面可能结冰"
     }
 }
