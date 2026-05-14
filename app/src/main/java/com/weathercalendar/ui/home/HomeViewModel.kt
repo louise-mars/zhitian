@@ -20,6 +20,8 @@ import com.weathercalendar.data.repository.UserPrefs
 import com.weathercalendar.data.repository.UserPrefsRepository
 import com.weathercalendar.data.repository.WeatherData
 import com.weathercalendar.data.repository.WeatherRepository
+import com.weathercalendar.domain.alert.AlertEngine
+import com.weathercalendar.domain.animation.AnimationDegradationManager
 import com.weathercalendar.util.LunarCalendar
 import com.weathercalendar.widget.WeatherWidgetDataProvider
 import com.weathercalendar.widget.WidgetRefreshWorker
@@ -54,6 +56,9 @@ data class HomeUiState(
     val todayEvents: List<com.weathercalendar.data.model.CalendarEvent> = emptyList(),
     val fromCache: Boolean = false,
     val tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
+    val weatherAlerts: List<com.weathercalendar.domain.alert.WeatherAlert> = emptyList(),
+    val animationDegraded: Boolean = false,
+    val iconAnimationEnabled: Boolean = true,
 )
 
 @HiltViewModel
@@ -64,6 +69,8 @@ class HomeViewModel @Inject constructor(
     private val userPrefsRepository: UserPrefsRepository,
     private val locationService: LocationService,
     private val eventRepository: EventRepository,
+    private val alertEngine: AlertEngine,
+    private val degradationManager: AnimationDegradationManager,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -87,6 +94,17 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(tempUnit = prefs.temperatureUnit) }
             }
         }
+        // 监听动画降级状态
+        viewModelScope.launch {
+            degradationManager.state.collect { degradation ->
+                _uiState.update {
+                    it.copy(
+                        animationDegraded = degradation.reason != AnimationDegradationManager.DegradationReason.NONE,
+                        iconAnimationEnabled = degradation.iconAnimationEnabled,
+                    )
+                }
+            }
+        }
     }
 
     fun loadData(forceRefresh: Boolean = false) {
@@ -100,6 +118,9 @@ class HomeViewModel @Inject constructor(
 
         freshDataLoaded = false
         loadJob = viewModelScope.launch {
+            // 检查动画降级状态
+            degradationManager.checkAndUpdate()
+
             // 立即更新日期（纯计算，零延迟）
             val today = LocalDate.now()
             val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINESE)
@@ -218,6 +239,10 @@ class HomeViewModel @Inject constructor(
         freshDataLoaded = true
         renderWeatherData(data, today, userPrefs)
 
+        // 保存天气条件供 Poetry Widget 使用
+        appContext.getSharedPreferences("poetry_widget", Context.MODE_PRIVATE)
+            .edit().putString("weather_condition", data.current.condition.name).apply()
+
         // 触发 Widget 刷新
         WidgetRefreshWorker.enqueue(appContext)
     }
@@ -273,6 +298,16 @@ class HomeViewModel @Inject constructor(
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,
             )
+        }
+
+        // 生成日程天气预警（异步，不阻塞 UI 渲染）
+        viewModelScope.launch {
+            try {
+                val alerts = alertEngine.generateAlerts(weatherData.daily)
+                _uiState.update { it.copy(weatherAlerts = alerts) }
+            } catch (_: Exception) {
+                // 预警生成失败不影响主流程
+            }
         }
     }
 

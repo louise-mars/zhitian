@@ -89,6 +89,9 @@ fun HomeScreen(
     fromCache: Boolean = false,
     error: String? = null,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
+    weatherAlerts: List<com.weathercalendar.domain.alert.WeatherAlert> = emptyList(),
+    iconAnimationEnabled: Boolean = true,
+    animationDegraded: Boolean = false,
     onCityClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -100,8 +103,9 @@ fun HomeScreen(
     val focusedDay = threeDays.getOrNull(pagerState.currentPage)
     val focusedCondition = focusedDay?.weather?.condition ?: currentWeather.condition
     val gradient = WeatherColors.gradientFor(focusedCondition, currentWeather.isDay)
-    val animatedStart by animateColorAsState(gradient.start, tween(500), label = "s")
-    val animatedEnd by animateColorAsState(gradient.end, tween(500), label = "e")
+    val transitionDuration = if (animationDegraded) 200 else 700
+    val animatedStart by animateColorAsState(gradient.start, tween(transitionDuration), label = "s")
+    val animatedEnd by animateColorAsState(gradient.end, tween(transitionDuration), label = "e")
     val textColor = WeatherColors.textColorOn(focusedCondition, currentWeather.isDay)
 
     var fusionExpandedIndex by remember { mutableIntStateOf(0) }
@@ -266,6 +270,15 @@ fun HomeScreen(
                         if (pagerState.currentPage == 0 && rainForecast != null) {
                             RainForecastCard(rainForecast = rainForecast, textColor = textColor,
                                 modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        // 日程天气预警
+                        if (weatherAlerts.isNotEmpty()) {
+                            ScheduleWeatherAlertCard(
+                                alerts = weatherAlerts,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
                             Spacer(Modifier.height(12.dp))
                         }
 

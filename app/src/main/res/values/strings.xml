@@ -3,6 +3,8 @@
     <string name="app_name">知天</string>
     <string name="widget_description">显示当前天气和今日日程</string>
     <string name="widget_name">知天</string>
+    <string name="poetry_widget_description">每日一句古诗词</string>
+    <string name="poetry_widget_name">知天·诗词</string>
 
     <!-- 设置页 -->
     <string name="settings_title">设置</string>

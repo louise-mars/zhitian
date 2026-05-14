@@ -141,6 +141,7 @@ class QWeatherRepository @Inject constructor(
                         condition = QWeatherCodeMapper.fromIconCode(d.iconDay),
                         tempMin = d.tempMin.toIntOrNull() ?: 0,
                         tempMax = d.tempMax.toIntOrNull() ?: 0,
+                        windSpeed = d.windSpeed.toIntOrNull() ?: 0,
                     )
                 }
 

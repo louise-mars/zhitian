@@ -65,6 +65,19 @@
                 android:resource="@xml/weather_widget_info" />
         </receiver>
 
+        <!-- 诗词 Widget -->
+        <receiver
+            android:name=".widget.PoetryWidgetReceiver"
+            android:exported="true"
+            android:label="@string/poetry_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/poetry_widget_info" />
+        </receiver>
+
         <!-- FileProvider for image sharing -->
         <provider
             android:name="androidx.core.content.FileProvider"
