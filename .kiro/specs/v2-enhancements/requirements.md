@@ -32,11 +32,15 @@
 
 1. WHEN the App is opened or resumed to the foreground, THE Alert_Engine SHALL query events from EventRepository and CalendarRepository for the next 15 days (starting from today) and cross-reference each event's date against the 15-day daily forecast from QWeatherRepository
 2. WHEN an event day matches a Bad_Weather condition, THE Alert_Engine SHALL generate an alert containing: the event name, the event date, the forecast weather condition label (e.g. "雨", "雷暴", "雪"), the triggering metric (e.g. "最高温 37°C"), and a suggestion referencing the weather condition
-3. THE Alert_Engine SHALL classify the following conditions as Bad_Weather: WeatherCondition RAINY, WeatherCondition STORMY, WeatherCondition SNOWY, daily maximum temperature exceeding 35°C, daily minimum temperature below -10°C, and daily maximum wind speed exceeding 39 km/h
+3. THE Alert_Engine SHALL classify the following conditions as Bad_Weather: WeatherCondition RAINY, WeatherCondition STORMY, WeatherCondition SNOWY, daily precipitation exceeding 10mm, daily maximum temperature exceeding 35°C, daily minimum temperature at or below 0°C, and daily maximum wind speed exceeding 39 km/h
 4. WHEN multiple events exist on the same bad-weather day, THE Alert_Engine SHALL generate one alert per event, each containing that event's specific name and the shared weather condition for that day
 5. WHEN no events coincide with bad weather in the next 15 days, THE Alert_Engine SHALL produce an empty alert list
 6. IF the weather forecast data is unavailable (network failure or API error), THEN THE Alert_Engine SHALL skip alert generation and produce an empty alert list without crashing
 7. IF calendar data is unavailable (permission denied or read failure), THEN THE Alert_Engine SHALL skip alert generation for the unavailable source and still process events from the other available repository
+8. THE Alert_Engine SHALL filter out indoor events by matching event titles against a set of indoor keywords (Zoom, Teams, 线上, 腾讯会议, 钉钉, 飞书, 居家, etc.) and SHALL NOT generate alerts for matched events
+9. WHEN the event is on today's date and has a specific time, THE Alert_Engine SHALL check the hourly forecast for ±1 hour around the event time instead of using the daily forecast
+10. WHEN active weather warnings exist from the meteorological bureau, THE Alert_Engine SHALL generate alerts for all outdoor events on today and tomorrow that do not match indoor keywords
+11. WHEN alerts are generated for tomorrow or the day after, THE WeatherAlertNotifier SHALL send a local OS notification (maximum 1 per day) to proactively inform the user
 
 ### Requirement 2: 日程天气预警卡片展示
 
