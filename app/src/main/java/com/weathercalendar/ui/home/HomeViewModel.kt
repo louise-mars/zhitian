@@ -59,6 +59,7 @@ data class HomeUiState(
     val weatherAlerts: List<com.weathercalendar.domain.alert.WeatherAlert> = emptyList(),
     val animationDegraded: Boolean = false,
     val iconAnimationEnabled: Boolean = true,
+    val forceDarkGradient: Boolean? = null,  // null=跟随日夜, true=深色, false=浅色
 )
 
 @HiltViewModel
@@ -88,10 +89,17 @@ class HomeViewModel @Inject constructor(
         appContext.getSharedPreferences("user_prefs_fallback", Context.MODE_PRIVATE)
 
     init {
-        // 监听温度单位变化，实时更新 UI
+        // 监听温度单位和主题变化，实时更新 UI
         viewModelScope.launch {
             userPrefsRepository.prefs.collect { prefs ->
-                _uiState.update { it.copy(tempUnit = prefs.temperatureUnit) }
+                val forceDark = when (prefs.themeMode) {
+                    com.weathercalendar.data.repository.ThemeMode.ALWAYS_DARK -> true
+                    com.weathercalendar.data.repository.ThemeMode.ALWAYS_LIGHT -> false
+                    com.weathercalendar.data.repository.ThemeMode.FOLLOW_SYSTEM -> null
+                }
+                _uiState.update {
+                    it.copy(tempUnit = prefs.temperatureUnit, forceDarkGradient = forceDark)
+                }
             }
         }
         // 监听动画降级状态

@@ -92,6 +92,7 @@ fun HomeScreen(
     weatherAlerts: List<com.weathercalendar.domain.alert.WeatherAlert> = emptyList(),
     iconAnimationEnabled: Boolean = true,
     animationDegraded: Boolean = false,
+    forceDarkGradient: Boolean? = null,
     onCityClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -102,7 +103,7 @@ fun HomeScreen(
     val pagerState = rememberPagerState(pageCount = { pageCount })
     val focusedDay = threeDays.getOrNull(pagerState.currentPage)
     val focusedCondition = focusedDay?.weather?.condition ?: currentWeather.condition
-    val gradient = WeatherColors.gradientFor(focusedCondition, currentWeather.isDay)
+    val gradient = WeatherColors.gradientFor(focusedCondition, currentWeather.isDay, forceDarkGradient)
     val transitionDuration = if (animationDegraded) 200 else 700
     val animatedStart by animateColorAsState(gradient.start, tween(transitionDuration), label = "s")
     val animatedEnd by animateColorAsState(gradient.end, tween(transitionDuration), label = "e")

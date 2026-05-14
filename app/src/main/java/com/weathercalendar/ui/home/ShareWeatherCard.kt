@@ -35,8 +35,11 @@ fun shareWeatherText(
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
+        putExtra(Intent.EXTRA_SUBJECT, "知天天气 · $cityName")
+        // 允许微信等 App 识别分享内容
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    context.startActivity(Intent.createChooser(intent, "分享天气"))
+    context.startActivity(Intent.createChooser(intent, "分享到"))
 }
 
 /**
@@ -110,12 +113,15 @@ fun shareWeatherImage(
     file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 90, it) }
     bitmap.recycle()
 
-    // Share via FileProvider
+    // Share via FileProvider — 使用 image/* 类型确保微信/微博等社交 App 能接收
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "image/png"
         putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, "知天天气 · $cityName")
+        putExtra(Intent.EXTRA_TEXT, "${currentWeather.condition.icon} $cityName ${currentWeather.temperature}° ${currentWeather.condition.label} — 知天")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    context.startActivity(Intent.createChooser(intent, "分享天气"))
+    context.startActivity(Intent.createChooser(intent, "分享到"))
 }

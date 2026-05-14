@@ -98,6 +98,7 @@ fun WeatherCalendarNavHost() {
                 weatherAlerts = uiState.weatherAlerts,
                 iconAnimationEnabled = uiState.iconAnimationEnabled,
                 animationDegraded = uiState.animationDegraded,
+                forceDarkGradient = uiState.forceDarkGradient,
                 onCityClick = { showCityPicker = true },
                 onCalendarClick = { navController.navigate(Routes.CALENDAR) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },

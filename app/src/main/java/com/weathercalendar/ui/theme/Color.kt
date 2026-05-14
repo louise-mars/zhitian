@@ -26,8 +26,32 @@ object WeatherColors {
     // 雾 — 中灰（不太亮也不太暗）
     private val Foggy = GradientPair(Color(0xFFA0B0BC), Color(0xFF6E8898))
 
-    fun gradientFor(condition: WeatherCondition, isDay: Boolean = true): GradientPair {
-        if (!isDay) return Night
+    // 浅色模式专用渐变（更明亮、更柔和）
+    private val SunnyLight = GradientPair(Color(0xFF87CEEB), Color(0xFF5DADE2))
+    private val CloudyLight = GradientPair(Color(0xFFA8C4D4), Color(0xFF7FA8B8))
+    private val RainyLight = GradientPair(Color(0xFF7FAAAC), Color(0xFF5A8A8C))
+    private val SnowyLight = GradientPair(Color(0xFFE8F0F8), Color(0xFFBDD4E8))
+    private val StormLight = GradientPair(Color(0xFF6E7E8A), Color(0xFF4E5E6A))
+    private val FoggyLight = GradientPair(Color(0xFFC0D0DC), Color(0xFF90A8B8))
+
+    fun gradientFor(condition: WeatherCondition, isDay: Boolean = true, forceDark: Boolean? = null): GradientPair {
+        // forceDark: true = 强制深色, false = 强制浅色, null = 跟随日夜
+        val useDark = forceDark ?: !isDay
+        if (useDark) return Night
+
+        // 浅色模式（forceDark == false）使用更明亮的渐变
+        if (forceDark == false) {
+            return when (condition) {
+                WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY -> SunnyLight
+                WeatherCondition.CLOUDY -> CloudyLight
+                WeatherCondition.FOGGY -> FoggyLight
+                WeatherCondition.DRIZZLE, WeatherCondition.RAINY -> RainyLight
+                WeatherCondition.SNOWY -> SnowyLight
+                WeatherCondition.STORMY -> StormLight
+            }
+        }
+
+        // 默认（跟随系统/白天）
         return when (condition) {
             WeatherCondition.SUNNY -> Sunny
             WeatherCondition.PARTLY_CLOUDY -> Sunny
