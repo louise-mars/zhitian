@@ -196,6 +196,7 @@ fun HomeScreen(
                                         condition = day.weather.condition, isDay = currentWeather.isDay,
                                     ),
                                     textColor = textColor, tempUnit = tempUnit,
+                                    iconAnimationEnabled = iconAnimationEnabled && page == 0,
                                     modifier = Modifier.padding(horizontal = 20.dp),
                                 )
                             }
@@ -204,6 +205,7 @@ fun HomeScreen(
                         } else {
                             CurrentWeatherCard(
                                 weather = currentWeather, textColor = textColor, tempUnit = tempUnit,
+                                iconAnimationEnabled = iconAnimationEnabled,
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
                         }

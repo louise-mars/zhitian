@@ -21,6 +21,7 @@ import com.weathercalendar.data.mock.MockData
 import com.weathercalendar.data.model.CurrentWeather
 import com.weathercalendar.data.repository.TemperatureUnit
 import com.weathercalendar.ui.components.GlassCard
+import com.weathercalendar.ui.components.WeatherIconAnimator
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
 import com.weathercalendar.util.formatTempShort
 
@@ -30,6 +31,7 @@ fun CurrentWeatherCard(
     textColor: Color,
     modifier: Modifier = Modifier,
     tempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
+    iconAnimationEnabled: Boolean = true,
 ) {
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -43,8 +45,11 @@ fun CurrentWeatherCard(
                 .padding(vertical = 24.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 天气图标
-            Text(text = weather.condition.icon, fontSize = 48.sp)
+            // 天气图标（微动画）
+            WeatherIconAnimator(
+                condition = weather.condition,
+                enabled = iconAnimationEnabled,
+            )
 
             Spacer(Modifier.height(4.dp))
 
