@@ -244,6 +244,25 @@ fun HomeScreen(
 
                         Spacer(Modifier.height(12.dp))
 
+                        // ═══ 预警区域（最醒目位置） ═══
+
+                        // 气象灾害预警（气象局官方，最高优先级）
+                        if (pagerState.currentPage == 0 && warnings.isNotEmpty()) {
+                            WeatherWarningCard(warnings = warnings, modifier = Modifier.padding(horizontal = 20.dp))
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        // 日程天气预警（日程×天气冲突）
+                        if (weatherAlerts.isNotEmpty()) {
+                            ScheduleWeatherAlertCard(
+                                alerts = weatherAlerts,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        // ═══ 信息区域 ═══
+
                         // 小时预报（仅今天显示，明后天无小时数据）
                         if (pagerState.currentPage == 0 && hourlyForecast.isNotEmpty()) {
                             HourlyForecastRow(items = hourlyForecast, textColor = textColor, tempUnit = tempUnit)
@@ -259,29 +278,14 @@ fun HomeScreen(
                             )
                         }
 
-                        // ═══ 第二屏：预警 + 降雨 + 7天预报 ═══
+                        // ═══ 第二屏：降雨 + 15天预报 ═══
 
                         Spacer(Modifier.height(16.dp))
-
-                        // 预警（仅今天显示）
-                        if (pagerState.currentPage == 0 && warnings.isNotEmpty()) {
-                            WeatherWarningCard(warnings = warnings, modifier = Modifier.padding(horizontal = 20.dp))
-                            Spacer(Modifier.height(12.dp))
-                        }
 
                         // 降雨预报（仅今天显示）
                         if (pagerState.currentPage == 0 && rainForecast != null) {
                             RainForecastCard(rainForecast = rainForecast, textColor = textColor,
                                 modifier = Modifier.padding(horizontal = 20.dp))
-                            Spacer(Modifier.height(12.dp))
-                        }
-
-                        // 日程天气预警
-                        if (weatherAlerts.isNotEmpty()) {
-                            ScheduleWeatherAlertCard(
-                                alerts = weatherAlerts,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            )
                             Spacer(Modifier.height(12.dp))
                         }
 

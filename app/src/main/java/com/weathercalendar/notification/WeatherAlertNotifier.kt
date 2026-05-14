@@ -52,14 +52,14 @@ object WeatherAlertNotifier {
         val lastPushDate = sp.getString(KEY_LAST_PUSH_DATE, null)
         if (lastPushDate == today) return
 
-        // 只推送明天和后天的预警（今天的用户在首页已经看到了）
-        val tomorrowAlerts = alerts.filter {
-            it.relativeDateText == "明天" || it.relativeDateText == "后天"
+        // 只推送未来 3 天的预警（今天的用户在首页已经看到了）
+        val futureAlerts = alerts.filter {
+            it.relativeDateText == "明天" || it.relativeDateText == "后天" || it.relativeDateText == "3天后"
         }
-        if (tomorrowAlerts.isEmpty()) return
+        if (futureAlerts.isEmpty()) return
 
         // 取第一条最紧急的预警
-        val alert = tomorrowAlerts.first()
+        val alert = futureAlerts.first()
         val title = "⚠️ ${alert.relativeDateText}天气提醒"
         val text = "${alert.relativeDateText}有${alert.eventName}，预计${alert.weatherLabel}，${alert.suggestion}"
 
