@@ -12,3 +12,6 @@ keystore.properties
 *.jks
 *.keystore
 app/build/
+
+# Internal development notes
+docs/LESSONS_LEARNED.md
