@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.weathercalendar.data.local.AppDatabase
 import com.weathercalendar.data.local.EventDao
+import com.weathercalendar.data.local.PoetryFavoriteDao
 import com.weathercalendar.data.local.WeatherDao
 import com.weathercalendar.data.remote.GeocodingApi
 import com.weathercalendar.data.remote.QWeatherApi
@@ -115,7 +116,10 @@ object AppModule {
             AppDatabase::class.java,
             "weather_calendar.db",
         )
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5,
+            )
             .build()
     }
 
@@ -129,5 +133,11 @@ object AppModule {
     @Singleton
     fun provideEventDao(db: AppDatabase): EventDao {
         return db.eventDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePoetryFavoriteDao(db: AppDatabase): PoetryFavoriteDao {
+        return db.poetryFavoriteDao()
     }
 }

@@ -29,7 +29,7 @@ import com.weathercalendar.util.DailyPoetry
 import java.time.LocalDate
 
 /**
- * 每日诗词卡片 — 点击展开完整诗词。
+ * 每日诗词卡片 — 点击展开完整诗词，支持收藏。
  */
 @Composable
 fun DailyPoetryCard(
@@ -37,6 +37,8 @@ fun DailyPoetryCard(
     condition: WeatherCondition,
     textColor: Color,
     modifier: Modifier = Modifier,
+    isFavorite: Boolean = false,
+    onFavoriteToggle: (() -> Unit)? = null,
 ) {
     val poetry = DailyPoetry.getPoetry(date, condition)
     var expanded by remember { mutableStateOf(false) }
@@ -68,6 +70,17 @@ fun DailyPoetryCard(
             fontFamily = FontFamily.Serif,
             fontWeight = FontWeight.Normal,
         )
+
+        // 收藏按钮
+        if (onFavoriteToggle != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (isFavorite) "❤️ 已收藏" else "🤍 收藏",
+                fontSize = 11.sp,
+                color = if (isFavorite) Color(0xFFE57373) else Color(0xFFD4A574).copy(alpha = 0.6f),
+                modifier = Modifier.clickable { onFavoriteToggle() },
+            )
+        }
 
         // 展开提示
         if (hasFullText && !expanded) {

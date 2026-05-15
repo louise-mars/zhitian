@@ -93,6 +93,7 @@ fun HomeScreen(
     iconAnimationEnabled: Boolean = true,
     animationDegraded: Boolean = false,
     forceDarkGradient: Boolean? = null,
+    dailyAdvice: com.weathercalendar.domain.advice.DailyAdviceEngine.DailyAdvice? = null,
     onCityClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -256,6 +257,15 @@ fun HomeScreen(
                         if (weatherAlerts.isNotEmpty()) {
                             ScheduleWeatherAlertCard(
                                 alerts = weatherAlerts,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        // 今日宜忌
+                        if (dailyAdvice != null && pagerState.currentPage == 0) {
+                            DailyAdviceCard(
+                                advice = dailyAdvice,
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
                             Spacer(Modifier.height(10.dp))

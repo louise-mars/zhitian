@@ -59,7 +59,8 @@ data class HomeUiState(
     val weatherAlerts: List<com.weathercalendar.domain.alert.WeatherAlert> = emptyList(),
     val animationDegraded: Boolean = false,
     val iconAnimationEnabled: Boolean = true,
-    val forceDarkGradient: Boolean? = null,  // null=跟随日夜, true=深色, false=浅色
+    val forceDarkGradient: Boolean? = null,
+    val dailyAdvice: com.weathercalendar.domain.advice.DailyAdviceEngine.DailyAdvice? = null,
 )
 
 @HiltViewModel
@@ -72,6 +73,7 @@ class HomeViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val alertEngine: AlertEngine,
     private val degradationManager: AnimationDegradationManager,
+    private val poetryRepository: com.weathercalendar.data.repository.PoetryRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -305,6 +307,9 @@ class HomeViewModel @Inject constructor(
                 todayEvents = mergedEventsMap[today] ?: emptyList(),
                 fromCache = weatherData.fromCache,
                 tempUnit = userPrefs.temperatureUnit,
+                dailyAdvice = com.weathercalendar.domain.advice.DailyAdviceEngine.generate(
+                    weatherData.daily.firstOrNull(), today
+                ),
             )
         }
 
@@ -345,5 +350,21 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             loadData()
         }
+    }
+
+    /** 切换当前诗词的收藏状态 */
+    fun togglePoetryFavorite(poetry: com.weathercalendar.util.DailyPoetry.Poetry) {
+        viewModelScope.launch {
+            if (poetryRepository.isFavorite(poetry)) {
+                poetryRepository.removeFavoriteByContent(poetry)
+            } else {
+                poetryRepository.addFavorite(poetry)
+            }
+        }
+    }
+
+    /** 检查当前诗词是否已收藏 */
+    suspend fun isPoetryFavorite(poetry: com.weathercalendar.util.DailyPoetry.Poetry): Boolean {
+        return poetryRepository.isFavorite(poetry)
     }
 }
