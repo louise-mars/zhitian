@@ -37,6 +37,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -81,8 +82,7 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     /** 标记阶段二（网络刷新）是否已完成，防止阶段一覆盖新数据 */
-    @Volatile
-    private var freshDataLoaded = false
+    private val freshDataLoaded = AtomicBoolean(false)
 
     /** 当前加载任务，防止重复刷新 */
     private var loadJob: kotlinx.coroutines.Job? = null
@@ -126,7 +126,7 @@ class HomeViewModel @Inject constructor(
             loadJob?.cancel()
         }
 
-        freshDataLoaded = false
+        freshDataLoaded.set(false)
         loadJob = viewModelScope.launch {
             // 检查动画降级状态
             degradationManager.checkAndUpdate()
@@ -171,14 +171,14 @@ class HomeViewModel @Inject constructor(
         }
 
         // 只有在阶段二尚未完成时才用缓存数据
-        if (freshDataLoaded) return
+        if (freshDataLoaded.get()) return
 
         _uiState.update { it.copy(cityName = cachedCity) }
 
         // getWeather 在缓存未过期时只读 Room，零网络
         val result = weatherRepository.getWeather(cachedLat, cachedLon)
         result.getOrNull()?.let { data ->
-            if (!freshDataLoaded) {
+            if (!freshDataLoaded.get()) {
                 renderWeatherData(data, today, userPrefs)
             }
         }
@@ -218,7 +218,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(cityName = city) }
             val result = weatherRepository.getWeather(lat, lon, forceRefresh = forceRefresh)
             result.getOrNull()?.let { data ->
-                freshDataLoaded = true
+                freshDataLoaded.set(true)
                 renderWeatherData(data, today, userPrefs)
             } ?: _uiState.update { it.copy(isLoading = false, error = "天气加载失败，请检查网络") }
             return
@@ -246,7 +246,7 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        freshDataLoaded = true
+        freshDataLoaded.set(true)
         renderWeatherData(data, today, userPrefs)
 
         // 保存天气条件供 Poetry Widget 使用

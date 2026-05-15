@@ -50,7 +50,7 @@ fun WeatherAnimationOverlay(
         WeatherCondition.RAINY, WeatherCondition.DRIZZLE ->
             GhibliRainEffect(
                 modifier = modifier,
-                intensity = if (condition == WeatherCondition.DRIZZLE) 40 else 80,
+                intensity = if (condition == WeatherCondition.DRIZZLE) 25 else 50,
             )
         WeatherCondition.SNOWY ->
             GhibliSnowEffect(modifier = modifier)
@@ -356,7 +356,7 @@ private fun GhibliSnowEffect(modifier: Modifier = Modifier) {
     var frameTime by remember { mutableLongStateOf(0L) }
 
     val flakes = remember {
-        List(80) {
+        List(45) {
             GhibliSnowflake(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
@@ -407,7 +407,7 @@ private fun GhibliSnowEffect(modifier: Modifier = Modifier) {
 
 @Composable
 private fun GhibliStormEffect(modifier: Modifier = Modifier) {
-    GhibliRainEffect(modifier = modifier, intensity = 120)
+    GhibliRainEffect(modifier = modifier, intensity = 60)
 
     val flashAlpha = remember { mutableListOf(0f) }
 

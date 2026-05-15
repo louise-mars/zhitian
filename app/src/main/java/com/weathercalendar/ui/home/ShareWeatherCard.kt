@@ -108,8 +108,9 @@ fun shareWeatherImage(
     textPaint.textAlign = Paint.Align.RIGHT
     canvas.drawText("— 知天", width - 80f, height - 80f, textPaint)
 
-    // Save to cache
-    val file = File(context.cacheDir, "share_weather.png")
+    // Save to cache/share/ subdirectory (restricted by FileProvider)
+    val shareDir = File(context.cacheDir, "share").also { it.mkdirs() }
+    val file = File(shareDir, "share_weather.png")
     file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 90, it) }
     bitmap.recycle()
 

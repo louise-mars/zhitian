@@ -2,6 +2,9 @@ package com.weathercalendar.util
 
 import android.content.Context
 import com.weathercalendar.data.model.WeatherCondition
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -11,8 +14,8 @@ import java.time.Month
  * 每日诗词 — 从 assets/poetry/ JSON 文件加载，支持 1200+ 首。
  *
  * 架构：
- * - 首次调用时从 assets 加载 JSON 到内存（懒加载）
- * - 按天气条件 + 季节双池合并
+ * - Application.onCreate 中在后台线程预加载所有 JSON
+ * - 线程安全：使用 @Synchronized 保护初始化
  * - 基于日期的确定性选择算法，保证同一天同一天气返回相同诗词
  * - 一周内不重复
  *
@@ -33,40 +36,54 @@ object DailyPoetry {
         val fullText: String = "",
     )
 
+    /** 内置最小 fallback（防止 assets 加载失败或加载中时无诗可用） */
+    private val FALLBACK_POEMS = listOf(
+        Poetry("春风又绿江南岸，明月何时照我还", "泊船瓜洲·王安石",
+            "京口瓜洲一水间，\n钟山只隔数重山。\n春风又绿江南岸，\n明月何时照我还。"),
+        Poetry("海内存知己，天涯若比邻", "送杜少府之任蜀州·王勃",
+            "城阙辅三秦，风烟望五津。\n与君离别意，同是宦游人。\n海内存知己，天涯若比邻。\n无为在歧路，儿女共沾巾。"),
+        Poetry("会当凌绝顶，一览众山小", "望岳·杜甫",
+            "岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n荡胸生曾云，决眦入归鸟。\n会当凌绝顶，一览众山小。"),
+        Poetry("但愿人长久，千里共婵娟", "水调歌头·苏轼",
+            "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n但愿人长久，千里共婵娟。"),
+        Poetry("长风破浪会有时，直挂云帆济沧海", "行路难·李白",
+            "行路难，行路难，多歧路，今安在？\n长风破浪会有时，直挂云帆济沧海。"),
+    )
+
     private val json = Json { ignoreUnknownKeys = true }
 
-    // 懒加载缓存
-    private var sunnyPoems: List<Poetry>? = null
-    private var rainPoems: List<Poetry>? = null
-    private var snowPoems: List<Poetry>? = null
-    private var cloudyPoems: List<Poetry>? = null
-    private var stormPoems: List<Poetry>? = null
-    private var fogPoems: List<Poetry>? = null
-    private var springPoems: List<Poetry>? = null
-    private var summerPoems: List<Poetry>? = null
-    private var autumnPoems: List<Poetry>? = null
-    private var winterPoems: List<Poetry>? = null
+    // 线程安全的诗词池（volatile 保证可见性，初始值为 fallback）
+    @Volatile private var sunnyPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var rainPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var snowPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var cloudyPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var stormPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var fogPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var springPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var summerPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var autumnPoems: List<Poetry> = FALLBACK_POEMS
+    @Volatile private var winterPoems: List<Poetry> = FALLBACK_POEMS
 
-    private var initialized = false
-    private var appContext: Context? = null
+    @Volatile private var initialized = false
 
     /**
-     * 初始化（在 Application.onCreate 中调用一次）。
+     * 初始化（在 Application.onCreate 中调用）。
+     * 在后台线程加载 JSON，不阻塞主线程。
+     * 加载完成前使用内置 fallback 诗词。
      */
     fun init(context: Context) {
-        appContext = context.applicationContext
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            loadAll(appContext)
+        }
     }
 
     /**
-     * 获取今日诗词。
-     * @param date 日期
-     * @param condition 天气条件
-     * @return 匹配的诗词（verse + source + fullText）
+     * 获取今日诗词（线程安全）。
      */
     fun getPoetry(date: LocalDate, condition: WeatherCondition): Poetry {
-        ensureLoaded()
         val pool = getPoolForCondition(condition) + getPoolForSeason(date)
-        if (pool.isEmpty()) return Poetry("春风又绿江南岸，明月何时照我还", "泊船瓜洲·王安石")
+        if (pool.isEmpty()) return FALLBACK_POEMS[0]
 
         // 确定性选择算法：基于日期，保证同一天返回相同诗词，一周内不重复
         val weekNumber = date.toEpochDay() / 7
@@ -80,52 +97,43 @@ object DailyPoetry {
 
     private fun getPoolForCondition(condition: WeatherCondition): List<Poetry> {
         return when (condition) {
-            WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY -> sunnyPoems ?: emptyList()
-            WeatherCondition.CLOUDY -> cloudyPoems ?: emptyList()
-            WeatherCondition.RAINY, WeatherCondition.DRIZZLE -> rainPoems ?: emptyList()
-            WeatherCondition.SNOWY -> snowPoems ?: emptyList()
-            WeatherCondition.STORMY -> stormPoems ?: emptyList()
-            WeatherCondition.FOGGY -> fogPoems ?: emptyList()
+            WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY -> sunnyPoems
+            WeatherCondition.CLOUDY -> cloudyPoems
+            WeatherCondition.RAINY, WeatherCondition.DRIZZLE -> rainPoems
+            WeatherCondition.SNOWY -> snowPoems
+            WeatherCondition.STORMY -> stormPoems
+            WeatherCondition.FOGGY -> fogPoems
         }
     }
 
     private fun getPoolForSeason(date: LocalDate): List<Poetry> {
         return when (date.month) {
-            Month.MARCH, Month.APRIL, Month.MAY -> springPoems ?: emptyList()
-            Month.JUNE, Month.JULY, Month.AUGUST -> summerPoems ?: emptyList()
-            Month.SEPTEMBER, Month.OCTOBER, Month.NOVEMBER -> autumnPoems ?: emptyList()
-            else -> winterPoems ?: emptyList()
+            Month.MARCH, Month.APRIL, Month.MAY -> springPoems
+            Month.JUNE, Month.JULY, Month.AUGUST -> summerPoems
+            Month.SEPTEMBER, Month.OCTOBER, Month.NOVEMBER -> autumnPoems
+            else -> winterPoems
         }
     }
 
-    private fun ensureLoaded() {
+    @Synchronized
+    private fun loadAll(context: Context) {
         if (initialized) return
-        val ctx = appContext ?: return
         try {
-            sunnyPoems = loadFromAsset(ctx, "poetry/sunny.json")
-            rainPoems = loadFromAsset(ctx, "poetry/rain.json")
-            snowPoems = loadFromAsset(ctx, "poetry/snow.json")
-            cloudyPoems = loadFromAsset(ctx, "poetry/cloudy.json")
-            stormPoems = loadFromAsset(ctx, "poetry/storm.json")
-            fogPoems = loadFromAsset(ctx, "poetry/fog.json")
-            springPoems = loadFromAsset(ctx, "poetry/spring.json")
-            summerPoems = loadFromAsset(ctx, "poetry/summer.json")
-            autumnPoems = loadFromAsset(ctx, "poetry/autumn.json")
-            winterPoems = loadFromAsset(ctx, "poetry/winter.json")
+            sunnyPoems = loadFromAsset(context, "poetry/sunny.json")
+            rainPoems = loadFromAsset(context, "poetry/rain.json")
+            snowPoems = loadFromAsset(context, "poetry/snow.json")
+            cloudyPoems = loadFromAsset(context, "poetry/cloudy.json")
+            stormPoems = loadFromAsset(context, "poetry/storm.json")
+            fogPoems = loadFromAsset(context, "poetry/fog.json")
+            springPoems = loadFromAsset(context, "poetry/spring.json")
+            summerPoems = loadFromAsset(context, "poetry/summer.json")
+            autumnPoems = loadFromAsset(context, "poetry/autumn.json")
+            winterPoems = loadFromAsset(context, "poetry/winter.json")
             initialized = true
+            android.util.Log.d("DailyPoetry", "诗词库加载完成: ${totalCount()} 首")
         } catch (e: Exception) {
-            android.util.Log.e("DailyPoetry", "加载诗词 JSON 失败", e)
-            // Fallback: 使用内置最小集
-            sunnyPoems = FALLBACK_POEMS
-            rainPoems = FALLBACK_POEMS
-            snowPoems = FALLBACK_POEMS
-            cloudyPoems = FALLBACK_POEMS
-            stormPoems = FALLBACK_POEMS
-            fogPoems = FALLBACK_POEMS
-            springPoems = FALLBACK_POEMS
-            summerPoems = FALLBACK_POEMS
-            autumnPoems = FALLBACK_POEMS
-            winterPoems = FALLBACK_POEMS
+            android.util.Log.e("DailyPoetry", "加载诗词 JSON 失败，使用 fallback", e)
+            // 保持 fallback（已在字段初始化时设置）
             initialized = true
         }
     }
@@ -134,24 +142,17 @@ object DailyPoetry {
         return try {
             val jsonStr = context.assets.open(path).bufferedReader().use { it.readText() }
             val items = json.decodeFromString<List<PoetryJson>>(jsonStr)
-            items.map { Poetry(verse = it.verse, source = it.source, fullText = it.fullText) }
+            val poems = items.map { Poetry(verse = it.verse, source = it.source, fullText = it.fullText) }
+            if (poems.isEmpty()) FALLBACK_POEMS else poems
         } catch (e: Exception) {
             android.util.Log.w("DailyPoetry", "加载 $path 失败: ${e.message}")
-            emptyList()
+            FALLBACK_POEMS
         }
     }
 
-    /** 内置最小 fallback（防止 assets 加载失败时无诗可用） */
-    private val FALLBACK_POEMS = listOf(
-        Poetry("春风又绿江南岸，明月何时照我还", "泊船瓜洲·王安石",
-            "京口瓜洲一水间，\n钟山只隔数重山。\n春风又绿江南岸，\n明月何时照我还。"),
-        Poetry("海内存知己，天涯若比邻", "送杜少府之任蜀州·王勃",
-            "城阙辅三秦，风烟望五津。\n与君离别意，同是宦游人。\n海内存知己，天涯若比邻。\n无为在歧路，儿女共沾巾。"),
-        Poetry("会当凌绝顶，一览众山小", "望岳·杜甫",
-            "岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n荡胸生曾云，决眦入归鸟。\n会当凌绝顶，一览众山小。"),
-        Poetry("但愿人长久，千里共婵娟", "水调歌头·苏轼",
-            "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n但愿人长久，千里共婵娟。"),
-        Poetry("长风破浪会有时，直挂云帆济沧海", "行路难·李白",
-            "行路难，行路难，多歧路，今安在？\n长风破浪会有时，直挂云帆济沧海。"),
-    )
+    private fun totalCount(): Int {
+        return sunnyPoems.size + rainPoems.size + snowPoems.size + cloudyPoems.size +
+            stormPoems.size + fogPoems.size + springPoems.size + summerPoems.size +
+            autumnPoems.size + winterPoems.size
+    }
 }
