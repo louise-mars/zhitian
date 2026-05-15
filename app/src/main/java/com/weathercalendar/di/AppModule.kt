@@ -7,7 +7,6 @@ import com.weathercalendar.data.local.AppDatabase
 import com.weathercalendar.data.local.EventDao
 import com.weathercalendar.data.local.PoetryFavoriteDao
 import com.weathercalendar.data.local.WeatherDao
-import com.weathercalendar.data.remote.GeocodingApi
 import com.weathercalendar.data.remote.QWeatherApi
 import com.weathercalendar.data.remote.WeatherApi
 import dagger.Module
@@ -68,25 +67,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("geocoding")
-    fun provideGeocodingRetrofit(client: OkHttpClient, json: Json): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(GeocodingApi.BASE_URL)
-            .client(client)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-    }
-
-    @Provides
-    @Singleton
     fun provideWeatherApi(@Named("weather") retrofit: Retrofit): WeatherApi {
         return retrofit.create(WeatherApi::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideGeocodingApi(@Named("geocoding") retrofit: Retrofit): GeocodingApi {
-        return retrofit.create(GeocodingApi::class.java)
     }
 
     @Provides

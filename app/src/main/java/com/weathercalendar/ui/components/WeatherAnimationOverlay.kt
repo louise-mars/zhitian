@@ -320,7 +320,7 @@ private fun GhibliRainEffect(modifier: Modifier = Modifier, intensity: Int = 80)
             // 带弧度的雨滴（贝塞尔曲线感）
             val path = Path().apply {
                 moveTo(startX, startY)
-                quadraticBezierTo(
+                quadraticTo(
                     startX + drop.curve * w, (startY + endY) / 2,
                     startX + drop.curve * w * 2, endY,
                 )
