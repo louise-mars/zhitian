@@ -3,6 +3,7 @@ package com.weathercalendar
 import android.app.Application
 import com.weathercalendar.notification.EventReminderScheduler
 import com.weathercalendar.notification.WeatherNotificationWorker
+import com.weathercalendar.util.DailyPoetry
 import com.weathercalendar.widget.WeatherWidgetWorker
 import com.weathercalendar.widget.WidgetRefreshWorker
 import dagger.hilt.android.HiltAndroidApp
@@ -12,6 +13,8 @@ class WeatherCalendarApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 初始化诗词库（从 assets JSON 加载）
+        DailyPoetry.init(this)
         // Widget 定时刷新（每小时）
         WeatherWidgetWorker.enqueue(this)
         // Widget 自动刷新（每小时，带网络约束）

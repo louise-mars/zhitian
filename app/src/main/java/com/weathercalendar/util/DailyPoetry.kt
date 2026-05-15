@@ -1,12 +1,22 @@
 package com.weathercalendar.util
 
+import android.content.Context
 import com.weathercalendar.data.model.WeatherCondition
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.Month
 
 /**
- * 每日诗词 — 根据天气、节气、季节匹配古诗词。
- * 诗词库 400+ 条，确保 365 天每天不重复。
+ * 每日诗词 — 从 assets/poetry/ JSON 文件加载，支持 1200+ 首。
+ *
+ * 架构：
+ * - 首次调用时从 assets 加载 JSON 到内存（懒加载）
+ * - 按天气条件 + 季节双池合并
+ * - 基于日期的确定性选择算法，保证同一天同一天气返回相同诗词
+ * - 一周内不重复
+ *
+ * 扩展方式：直接往 assets/poetry/ 目录的 JSON 文件中添加条目即可。
  */
 object DailyPoetry {
 
@@ -16,318 +26,132 @@ object DailyPoetry {
         val fullText: String = "",  // 完整诗词（空则不可展开）
     )
 
-    fun getPoetry(date: LocalDate, condition: WeatherCondition): Poetry {
-        val pool = getPoolForCondition(condition) + getPoolForSeason(date)
-        if (pool.isEmpty()) return Poetry("", "")
+    @Serializable
+    private data class PoetryJson(
+        val verse: String,
+        val source: String,
+        val fullText: String = "",
+    )
 
-        // 保证一周内不重复：用 weekOfEpoch 作为基础偏移，dayOfWeek 作为步进
+    private val json = Json { ignoreUnknownKeys = true }
+
+    // 懒加载缓存
+    private var sunnyPoems: List<Poetry>? = null
+    private var rainPoems: List<Poetry>? = null
+    private var snowPoems: List<Poetry>? = null
+    private var cloudyPoems: List<Poetry>? = null
+    private var stormPoems: List<Poetry>? = null
+    private var fogPoems: List<Poetry>? = null
+    private var springPoems: List<Poetry>? = null
+    private var summerPoems: List<Poetry>? = null
+    private var autumnPoems: List<Poetry>? = null
+    private var winterPoems: List<Poetry>? = null
+
+    private var initialized = false
+    private var appContext: Context? = null
+
+    /**
+     * 初始化（在 Application.onCreate 中调用一次）。
+     */
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * 获取今日诗词。
+     * @param date 日期
+     * @param condition 天气条件
+     * @return 匹配的诗词（verse + source + fullText）
+     */
+    fun getPoetry(date: LocalDate, condition: WeatherCondition): Poetry {
+        ensureLoaded()
+        val pool = getPoolForCondition(condition) + getPoolForSeason(date)
+        if (pool.isEmpty()) return Poetry("春风又绿江南岸，明月何时照我还", "泊船瓜洲·王安石")
+
+        // 确定性选择算法：基于日期，保证同一天返回相同诗词，一周内不重复
         val weekNumber = date.toEpochDay() / 7
         val dayInWeek = date.dayOfWeek.value  // 1-7
-        val baseOffset = ((weekNumber * 13 + condition.ordinal * 3) % pool.size).toInt()
+        val baseOffset = ((weekNumber * 13 + condition.ordinal * 7) % pool.size).toInt()
             .let { if (it < 0) it + pool.size else it }
-        // 每天在池中步进不同距离，确保 7 天内不会选到同一首
-        val step = (pool.size / 8).coerceAtLeast(1)  // 步进至少为 1
+        val step = (pool.size / 8).coerceAtLeast(1)
         val index = (baseOffset + dayInWeek * step) % pool.size
         return pool[index]
     }
 
     private fun getPoolForCondition(condition: WeatherCondition): List<Poetry> {
         return when (condition) {
-            WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY -> SUNNY_POEMS
-            WeatherCondition.CLOUDY -> CLOUDY_POEMS
-            WeatherCondition.RAINY, WeatherCondition.DRIZZLE -> RAIN_POEMS
-            WeatherCondition.SNOWY -> SNOW_POEMS
-            WeatherCondition.STORMY -> STORM_POEMS
-            WeatherCondition.FOGGY -> FOG_POEMS
+            WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY -> sunnyPoems ?: emptyList()
+            WeatherCondition.CLOUDY -> cloudyPoems ?: emptyList()
+            WeatherCondition.RAINY, WeatherCondition.DRIZZLE -> rainPoems ?: emptyList()
+            WeatherCondition.SNOWY -> snowPoems ?: emptyList()
+            WeatherCondition.STORMY -> stormPoems ?: emptyList()
+            WeatherCondition.FOGGY -> fogPoems ?: emptyList()
         }
     }
 
     private fun getPoolForSeason(date: LocalDate): List<Poetry> {
         return when (date.month) {
-            Month.MARCH, Month.APRIL, Month.MAY -> SPRING_POEMS
-            Month.JUNE, Month.JULY, Month.AUGUST -> SUMMER_POEMS
-            Month.SEPTEMBER, Month.OCTOBER, Month.NOVEMBER -> AUTUMN_POEMS
-            else -> WINTER_POEMS
+            Month.MARCH, Month.APRIL, Month.MAY -> springPoems ?: emptyList()
+            Month.JUNE, Month.JULY, Month.AUGUST -> summerPoems ?: emptyList()
+            Month.SEPTEMBER, Month.OCTOBER, Month.NOVEMBER -> autumnPoems ?: emptyList()
+            else -> winterPoems ?: emptyList()
         }
     }
 
-    // ═══ 晴天 ═══
-    private val SUNNY_POEMS = listOf(
-        Poetry("水光潋滟晴方好，山色空蒙雨亦奇", "饮湖上初晴后雨·苏轼",
-            "水光潋滟晴方好，\n山色空蒙雨亦奇。\n欲把西湖比西子，\n淡妆浓抹总相宜。"),
-        Poetry("晴空一鹤排云上，便引诗情到碧霄", "秋词·刘禹锡",
-            "自古逢秋悲寂寥，\n我言秋日胜春朝。\n晴空一鹤排云上，\n便引诗情到碧霄。"),
-        Poetry("胜日寻芳泗水滨，无边光景一时新", "春日·朱熹",
-            "胜日寻芳泗水滨，\n无边光景一时新。\n等闲识得东风面，\n万紫千红总是春。"),
-        Poetry("日出江花红胜火，春来江水绿如蓝", "忆江南·白居易",
-            "江南好，风景旧曾谙。\n日出江花红胜火，\n春来江水绿如蓝。\n能不忆江南？"),
-        Poetry("接天莲叶无穷碧，映日荷花别样红", "晓出净慈寺送林子方·杨万里",
-            "毕竟西湖六月中，\n风光不与四时同。\n接天莲叶无穷碧，\n映日荷花别样红。"),
-        Poetry("千里莺啼绿映红，水村山郭酒旗风", "江南春·杜牧",
-            "千里莺啼绿映红，\n水村山郭酒旗风。\n南朝四百八十寺，\n多少楼台烟雨中。"),
-        Poetry("迟日江山丽，春风花草香", "绝句·杜甫",
-            "迟日江山丽，春风花草香。\n泥融飞燕子，沙暖睡鸳鸯。"),
-        Poetry("风日晴和人意好，夕阳箫鼓几船归", "西湖·欧阳修", ""),
-        Poetry("天街小雨润如酥，草色遥看近却无", "早春呈水部张十八员外·韩愈",
-            "天街小雨润如酥，\n草色遥看近却无。\n最是一年春好处，\n绝胜烟柳满皇都。"),
-        Poetry("春城无处不飞花，寒食东风御柳斜", "寒食·韩翃",
-            "春城无处不飞花，\n寒食东风御柳斜。\n日暮汉宫传蜡烛，\n轻烟散入五侯家。"),
-        Poetry("两个黄鹂鸣翠柳，一行白鹭上青天", "绝句·杜甫",
-            "两个黄鹂鸣翠柳，\n一行白鹭上青天。\n窗含西岭千秋雪，\n门泊东吴万里船。"),
-        Poetry("碧玉妆成一树高，万条垂下绿丝绦", "咏柳·贺知章",
-            "碧玉妆成一树高，\n万条垂下绿丝绦。\n不知细叶谁裁出，\n二月春风似剪刀。"),
-        Poetry("白日依山尽，黄河入海流", "登鹳雀楼·王之涣",
-            "白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。"),
-        Poetry("大漠孤烟直，长河落日圆", "使至塞上·王维",
-            "单车欲问边，属国过居延。\n征蓬出汉塞，归雁入胡天。\n大漠孤烟直，长河落日圆。\n萧关逢候骑，都护在燕然。"),
-        Poetry("落日熔金，暮云合璧，人在何处", "永遇乐·李清照", ""),
-        Poetry("东风夜放花千树，更吹落、星如雨", "青玉案·辛弃疾",
-            "东风夜放花千树，更吹落、星如雨。\n宝马雕车香满路。\n凤箫声动，玉壶光转，一夜鱼龙舞。\n蛾儿雪柳黄金缕，笑语盈盈暗香去。\n众里寻他千百度，\n蓦然回首，那人却在，灯火阑珊处。"),
-        Poetry("众里寻他千百度，蓦然回首，那人却在灯火阑珊处", "青玉案·辛弃疾", ""),
-        Poetry("明月别枝惊鹊，清风半夜鸣蝉", "西江月·辛弃疾",
-            "明月别枝惊鹊，清风半夜鸣蝉。\n稻花香里说丰年，听取蛙声一片。\n七八个星天外，两三点雨山前。\n旧时茅店社林边，路转溪桥忽见。"),
-        Poetry("春风得意马蹄疾，一日看尽长安花", "登科后·孟郊",
-            "昔日龌龊不足夸，\n今朝放荡思无涯。\n春风得意马蹄疾，\n一日看尽长安花。"),
-        Poetry("长风破浪会有时，直挂云帆济沧海", "行路难·李白",
-            "金樽清酒斗十千，玉盘珍羞直万钱。\n停杯投箸不能食，拔剑四顾心茫然。\n欲渡黄河冰塞川，将登太行雪满山。\n闲来垂钓碧溪上，忽复乘舟梦日边。\n行路难，行路难，多歧路，今安在？\n长风破浪会有时，直挂云帆济沧海。"),
-        Poetry("会当凌绝顶，一览众山小", "望岳·杜甫",
-            "岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n荡胸生曾云，决眦入归鸟。\n会当凌绝顶，一览众山小。"),
-        Poetry("海内存知己，天涯若比邻", "送杜少府之任蜀州·王勃",
-            "城阙辅三秦，风烟望五津。\n与君离别意，同是宦游人。\n海内存知己，天涯若比邻。\n无为在歧路，儿女共沾巾。"),
-        Poetry("莫愁前路无知己，天下谁人不识君", "别董大·高适",
-            "千里黄云白日曛，\n北风吹雁雪纷纷。\n莫愁前路无知己，\n天下谁人不识君。"),
-        Poetry("欲穷千里目，更上一层楼", "登鹳雀楼·王之涣",
-            "白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。"),
-        Poetry("不识庐山真面目，只缘身在此山中", "题西林壁·苏轼",
-            "横看成岭侧成峰，\n远近高低各不同。\n不识庐山真面目，\n只缘身在此山中。"),
-    )
+    private fun ensureLoaded() {
+        if (initialized) return
+        val ctx = appContext ?: return
+        try {
+            sunnyPoems = loadFromAsset(ctx, "poetry/sunny.json")
+            rainPoems = loadFromAsset(ctx, "poetry/rain.json")
+            snowPoems = loadFromAsset(ctx, "poetry/snow.json")
+            cloudyPoems = loadFromAsset(ctx, "poetry/cloudy.json")
+            stormPoems = loadFromAsset(ctx, "poetry/storm.json")
+            fogPoems = loadFromAsset(ctx, "poetry/fog.json")
+            springPoems = loadFromAsset(ctx, "poetry/spring.json")
+            summerPoems = loadFromAsset(ctx, "poetry/summer.json")
+            autumnPoems = loadFromAsset(ctx, "poetry/autumn.json")
+            winterPoems = loadFromAsset(ctx, "poetry/winter.json")
+            initialized = true
+        } catch (e: Exception) {
+            android.util.Log.e("DailyPoetry", "加载诗词 JSON 失败", e)
+            // Fallback: 使用内置最小集
+            sunnyPoems = FALLBACK_POEMS
+            rainPoems = FALLBACK_POEMS
+            snowPoems = FALLBACK_POEMS
+            cloudyPoems = FALLBACK_POEMS
+            stormPoems = FALLBACK_POEMS
+            fogPoems = FALLBACK_POEMS
+            springPoems = FALLBACK_POEMS
+            summerPoems = FALLBACK_POEMS
+            autumnPoems = FALLBACK_POEMS
+            winterPoems = FALLBACK_POEMS
+            initialized = true
+        }
+    }
 
-    // ═══ 雨天 ═══
-    private val RAIN_POEMS = listOf(
-        Poetry("好雨知时节，当春乃发生", "春夜喜雨·杜甫",
-            "好雨知时节，当春乃发生。\n随风潜入夜，润物细无声。\n野径云俱黑，江船火独明。\n晓看红湿处，花重锦官城。"),
-        Poetry("清明时节雨纷纷，路上行人欲断魂", "清明·杜牧",
-            "清明时节雨纷纷，\n路上行人欲断魂。\n借问酒家何处有？\n牧童遥指杏花村。"),
-        Poetry("夜来风雨声，花落知多少", "春晓·孟浩然",
-            "春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。"),
-        Poetry("空山新雨后，天气晚来秋", "山居秋暝·王维",
-            "空山新雨后，天气晚来秋。\n明月松间照，清泉石上流。\n竹喧归浣女，莲动下渔舟。\n随意春芳歇，王孙自可留。"),
-        Poetry("渭城朝雨浥轻尘，客舍青青柳色新", "送元二使安西·王维",
-            "渭城朝雨浥轻尘，\n客舍青青柳色新。\n劝君更尽一杯酒，\n西出阳关无故人。"),
-        Poetry("黑云翻墨未遮山，白雨跳珠乱入船", "六月二十七日望湖楼醉书·苏轼",
-            "黑云翻墨未遮山，\n白雨跳珠乱入船。\n卷地风来忽吹散，\n望湖楼下水如天。"),
-        Poetry("小楼一夜听春雨，深巷明朝卖杏花", "临安春雨初霁·陆游",
-            "世味年来薄似纱，\n谁令骑马客京华。\n小楼一夜听春雨，\n深巷明朝卖杏花。\n矮纸斜行闲作草，\n晴窗细乳戏分茶。\n素衣莫起风尘叹，\n犹及清明可到家。"),
-        Poetry("梧桐更兼细雨，到黄昏、点点滴滴", "声声慢·李清照",
-            "寻寻觅觅，冷冷清清，凄凄惨惨戚戚。\n乍暖还寒时候，最难将息。\n三杯两盏淡酒，怎敌他、晚来风急！\n雁过也，正伤心，却是旧时相识。\n满地黄花堆积，憔悴损，如今有谁堪摘？\n守着窗儿，独自怎生得黑！\n梧桐更兼细雨，到黄昏、点点滴滴。\n这次第，怎一个愁字了得！"),
-        Poetry("何当共剪西窗烛，却话巴山夜雨时", "夜雨寄北·李商隐",
-            "君问归期未有期，\n巴山夜雨涨秋池。\n何当共剪西窗烛，\n却话巴山夜雨时。"),
-        Poetry("南朝四百八十寺，多少楼台烟雨中", "江南春·杜牧",
-            "千里莺啼绿映红，\n水村山郭酒旗风。\n南朝四百八十寺，\n多少楼台烟雨中。"),
-        Poetry("随风潜入夜，润物细无声", "春夜喜雨·杜甫", ""),
-        Poetry("青箬笠，绿蓑衣，斜风细雨不须归", "渔歌子·张志和",
-            "西塞山前白鹭飞，\n桃花流水鳜鱼肥。\n青箬笠，绿蓑衣，\n斜风细雨不须归。"),
-        Poetry("水光潋滟晴方好，山色空蒙雨亦奇", "饮湖上初晴后雨·苏轼", ""),
-        Poetry("春潮带雨晚来急，野渡无人舟自横", "滁州西涧·韦应物",
-            "独怜幽草涧边生，\n上有黄鹂深树鸣。\n春潮带雨晚来急，\n野渡无人舟自横。"),
-        Poetry("寒雨连江夜入吴，平明送客楚山孤", "芙蓉楼送辛渐·王昌龄",
-            "寒雨连江夜入吴，\n平明送客楚山孤。\n洛阳亲友如相问，\n一片冰心在玉壶。"),
-        Poetry("君问归期未有期，巴山夜雨涨秋池", "夜雨寄北·李商隐", ""),
-        Poetry("一蓑烟雨任平生", "定风波·苏轼",
-            "莫听穿林打叶声，何妨吟啸且徐行。\n竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生。\n料峭春风吹酒醒，微冷，山头斜照却相迎。\n回首向来萧瑟处，归去，也无风雨也无晴。"),
-        Poetry("竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生", "定风波·苏轼", ""),
-        Poetry("料峭春风吹酒醒，微冷，山头斜照却相迎", "定风波·苏轼", ""),
-        Poetry("帘外雨潺潺，春意阑珊", "浪淘沙令·李煜",
-            "帘外雨潺潺，春意阑珊。\n罗衾不耐五更寒。\n梦里不知身是客，一晌贪欢。\n独自莫凭栏，无限江山。\n别时容易见时难。\n流水落花春去也，天上人间。"),
-        Poetry("昨夜雨疏风骤，浓睡不消残酒", "如梦令·李清照",
-            "昨夜雨疏风骤，\n浓睡不消残酒。\n试问卷帘人，\n却道海棠依旧。\n知否，知否？\n应是绿肥红瘦。"),
-        Poetry("试问卷帘人，却道海棠依旧", "如梦令·李清照", ""),
-        Poetry("少年听雨歌楼上，红烛昏罗帐", "虞美人·蒋捷",
-            "少年听雨歌楼上，红烛昏罗帐。\n壮年听雨客舟中，江阔云低、断雁叫西风。\n而今听雨僧庐下，鬓已星星也。\n悲欢离合总无情，一任阶前、点滴到天明。"),
-        Poetry("壮年听雨客舟中，江阔云低、断雁叫西风", "虞美人·蒋捷", ""),
-        Poetry("而今听雨僧庐下，鬓已星星也", "虞美人·蒋捷", ""),
-        Poetry("东边日出西边雨，道是无晴却有晴", "竹枝词·刘禹锡",
-            "杨柳青青江水平，\n闻郎江上踏歌声。\n东边日出西边雨，\n道是无晴却有晴。"),
-        Poetry("沾衣欲湿杏花雨，吹面不寒杨柳风", "绝句·志南",
-            "古木阴中系短篷，\n杖藜扶我过桥东。\n沾衣欲湿杏花雨，\n吹面不寒杨柳风。"),
-        Poetry("细雨鱼儿出，微风燕子斜", "水槛遣心·杜甫",
-            "去郭轩楹敞，无村眺望赊。\n澄江平少岸，幽树晚多花。\n细雨鱼儿出，微风燕子斜。\n城中十万户，此地两三家。"),
-        Poetry("七八个星天外，两三点雨山前", "西江月·辛弃疾",
-            "明月别枝惊鹊，清风半夜鸣蝉。\n稻花香里说丰年，听取蛙声一片。\n七八个星天外，两三点雨山前。\n旧时茅店社林边，路转溪桥忽见。"),
-        Poetry("山路元无雨，空翠湿人衣", "山中·王维",
-            "荆溪白石出，天寒红叶稀。\n山路元无雨，空翠湿人衣。"),
-    )
+    private fun loadFromAsset(context: Context, path: String): List<Poetry> {
+        return try {
+            val jsonStr = context.assets.open(path).bufferedReader().use { it.readText() }
+            val items = json.decodeFromString<List<PoetryJson>>(jsonStr)
+            items.map { Poetry(verse = it.verse, source = it.source, fullText = it.fullText) }
+        } catch (e: Exception) {
+            android.util.Log.w("DailyPoetry", "加载 $path 失败: ${e.message}")
+            emptyList()
+        }
+    }
 
-    // ═══ 雪天 ═══
-    private val SNOW_POEMS = listOf(
-        Poetry("忽如一夜春风来，千树万树梨花开", "白雪歌送武判官归京·岑参",
-            "北风卷地白草折，胡天八月即飞雪。\n忽如一夜春风来，千树万树梨花开。\n散入珠帘湿罗幕，狐裘不暖锦衾薄。\n将军角弓不得控，都护铁衣冷难着。\n瀚海阑干百丈冰，愁云惨淡万里凝。\n中军置酒饮归客，胡琴琵琶与羌笛。\n纷纷暮雪下辕门，风掣红旗冻不翻。\n轮台东门送君去，去时雪满天山路。\n山回路转不见君，雪上空留马行处。"),
-        Poetry("孤舟蓑笠翁，独钓寒江雪", "江雪·柳宗元",
-            "千山鸟飞绝，万径人踪灭。\n孤舟蓑笠翁，独钓寒江雪。"),
-        Poetry("窗含西岭千秋雪，门泊东吴万里船", "绝句·杜甫",
-            "两个黄鹂鸣翠柳，\n一行白鹭上青天。\n窗含西岭千秋雪，\n门泊东吴万里船。"),
-        Poetry("梅须逊雪三分白，雪却输梅一段香", "雪梅·卢梅坡",
-            "梅雪争春未肯降，\n骚人阁笔费评章。\n梅须逊雪三分白，\n雪却输梅一段香。"),
-        Poetry("北风卷地白草折，胡天八月即飞雪", "白雪歌送武判官归京·岑参",
-            "北风卷地白草折，胡天八月即飞雪。\n忽如一夜春风来，千树万树梨花开。\n散入珠帘湿罗幕，狐裘不暖锦衾薄。\n将军角弓不得控，都护铁衣冷难着。\n瀚海阑干百丈冰，愁云惨淡万里凝。\n中军置酒饮归客，胡琴琵琶与羌笛。\n纷纷暮雪下辕门，风掣红旗冻不翻。\n轮台东门送君去，去时雪满天山路。\n山回路转不见君，雪上空留马行处。"),
-        Poetry("柴门闻犬吠，风雪夜归人", "逢雪宿芙蓉山主人·刘长卿",
-            "日暮苍山远，天寒白屋贫。\n柴门闻犬吠，风雪夜归人。"),
-        Poetry("日暮苍山远，天寒白屋贫", "逢雪宿芙蓉山主人·刘长卿",
-            "日暮苍山远，天寒白屋贫。\n柴门闻犬吠，风雪夜归人。"),
-        Poetry("欲将轻骑逐，大雪满弓刀", "塞下曲·卢纶",
-            "月黑雁飞高，单于夜遁逃。\n欲将轻骑逐，大雪满弓刀。"),
-        Poetry("燕山雪花大如席，片片吹落轩辕台", "北风行·李白",
-            "烛龙栖寒门，光曜犹旦开。\n日月照之何不及此？惟有北风号怒天上来。\n燕山雪花大如席，片片吹落轩辕台。\n幽州思妇十二月，停歌罢笑双蛾摧。"),
-        Poetry("白雪却嫌春色晚，故穿庭树作飞花", "春雪·韩愈",
-            "新年都未有芳华，\n二月初惊见草芽。\n白雪却嫌春色晚，\n故穿庭树作飞花。"),
-        Poetry("终南阴岭秀，积雪浮云端", "终南望余雪·祖咏",
-            "终南阴岭秀，积雪浮云端。\n林表明霁色，城中增暮寒。"),
-        Poetry("千里黄云白日曛，北风吹雁雪纷纷", "别董大·高适",
-            "千里黄云白日曛，\n北风吹雁雪纷纷。\n莫愁前路无知己，\n天下谁人不识君。"),
-        Poetry("有梅无雪不精神，有雪无诗俗了人", "雪梅·卢梅坡",
-            "有梅无雪不精神，\n有雪无诗俗了人。\n日暮诗成天又雪，\n与梅并作十分春。"),
-        Poetry("晚来天欲雪，能饮一杯无", "问刘十九·白居易",
-            "绿蚁新醅酒，红泥小火炉。\n晚来天欲雪，能饮一杯无？"),
-        Poetry("风一更，雪一更，聒碎乡心梦不成", "长相思·纳兰性德",
-            "山一程，水一程，\n身向榆关那畔行，夜深千帐灯。\n风一更，雪一更，\n聒碎乡心梦不成，故园无此声。"),
-        Poetry("昔去雪如花，今来花似雪", "别诗·范云",
-            "洛阳城东西，长作经时别。\n昔去雪如花，今来花似雪。"),
-    )
-
-    // ═══ 阴天 ═══
-    private val CLOUDY_POEMS = listOf(
-        Poetry("行到水穷处，坐看云起时", "终南别业·王维",
-            "中岁颇好道，晚家南山陲。\n兴来每独往，胜事空自知。\n行到水穷处，坐看云起时。\n偶然值林叟，谈笑无还期。"),
-        Poetry("远上寒山石径斜，白云生处有人家", "山行·杜牧",
-            "远上寒山石径斜，\n白云生处有人家。\n停车坐爱枫林晚，\n霜叶红于二月花。"),
-        Poetry("黄河远上白云间，一片孤城万仞山", "凉州词·王之涣",
-            "黄河远上白云间，\n一片孤城万仞山。\n羌笛何须怨杨柳，\n春风不度玉门关。"),
-        Poetry("只在此山中，云深不知处", "寻隐者不遇·贾岛",
-            "松下问童子，言师采药去。\n只在此山中，云深不知处。"),
-        Poetry("不畏浮云遮望眼，自缘身在最高层", "登飞来峰·王安石",
-            "飞来山上千寻塔，\n闻说鸡鸣见日升。\n不畏浮云遮望眼，\n自缘身在最高层。"),
-        Poetry("云想衣裳花想容，春风拂槛露华浓", "清平调·李白",
-            "云想衣裳花想容，\n春风拂槛露华浓。\n若非群玉山头见，\n会向瑶台月下逢。"),
-        Poetry("浮云游子意，落日故人情", "送友人·李白",
-            "青山横北郭，白水绕东城。\n此地一为别，孤蓬万里征。\n浮云游子意，落日故人情。\n挥手自兹去，萧萧班马鸣。"),
-        Poetry("总为浮云能蔽日，长安不见使人愁", "登金陵凤凰台·李白",
-            "凤凰台上凤凰游，凤去台空江自流。\n吴宫花草埋幽径，晋代衣冠成古丘。\n三山半落青天外，二水中分白鹭洲。\n总为浮云能蔽日，长安不见使人愁。"),
-        Poetry("野径云俱黑，江船火独明", "春夜喜雨·杜甫",
-            "好雨知时节，当春乃发生。\n随风潜入夜，润物细无声。\n野径云俱黑，江船火独明。\n晓看红湿处，花重锦官城。"),
-        Poetry("曾经沧海难为水，除却巫山不是云", "离思·元稹",
-            "曾经沧海难为水，\n除却巫山不是云。\n取次花丛懒回顾，\n半缘修道半缘君。"),
-        Poetry("薄云岩际宿，孤月浪中翻", "宿桐庐江寄广陵旧游·孟浩然",
-            "山暝闻猿愁，沧江急夜流。\n风鸣两岸叶，月照一孤舟。\n建德非吾土，维扬忆旧游。\n还将两行泪，遥寄海西头。"),
-        Poetry("黄鹤一去不复返，白云千载空悠悠", "黄鹤楼·崔颢",
-            "昔人已乘黄鹤去，此地空余黄鹤楼。\n黄鹤一去不复返，白云千载空悠悠。\n晴川历历汉阳树，芳草萋萋鹦鹉洲。\n日暮乡关何处是？烟波江上使人愁。"),
-        Poetry("朝辞白帝彩云间，千里江陵一日还", "早发白帝城·李白",
-            "朝辞白帝彩云间，\n千里江陵一日还。\n两岸猿声啼不住，\n轻舟已过万重山。"),
-        Poetry("明月出天山，苍茫云海间", "关山月·李白",
-            "明月出天山，苍茫云海间。\n长风几万里，吹度玉门关。\n汉下白登道，胡窥青海湾。\n由来征战地，不见有人还。\n戍客望边邑，思归多苦颜。\n高楼当此夜，叹息未应闲。"),
-        Poetry("云横秦岭家何在，雪拥蓝关马不前", "左迁至蓝关示侄孙湘·韩愈",
-            "一封朝奏九重天，\n夕贬潮州路八千。\n欲为圣明除弊事，\n肯将衰朽惜残年！\n云横秦岭家何在？\n雪拥蓝关马不前。\n知汝远来应有意，\n好收吾骨瘴江边。"),
-        Poetry("闲云潭影日悠悠，物换星移几度秋", "滕王阁诗·王勃",
-            "滕王高阁临江渚，佩玉鸣鸾罢歌舞。\n画栋朝飞南浦云，珠帘暮卷西山雨。\n闲云潭影日悠悠，物换星移几度秋。\n阁中帝子今何在？槛外长江空自流。"),
-    )
-
-    // ═══ 雷暴 ═══
-    private val STORM_POEMS = listOf(
-        Poetry("山雨欲来风满楼", "咸阳城东楼·许浑",
-            "一上高城万里愁，蒹葭杨柳似汀洲。\n溪云初起日沉阁，山雨欲来风满楼。\n鸟下绿芜秦苑夕，蝉鸣黄叶汉宫秋。\n行人莫问当年事，故国东来渭水流。"),
-        Poetry("黑云压城城欲摧，甲光向日金鳞开", "雁门太守行·李贺",
-            "黑云压城城欲摧，甲光向日金鳞开。\n角声满天秋色里，塞上燕脂凝夜紫。\n半卷红旗临易水，霜重鼓寒声不起。\n报君黄金台上意，提携玉龙为君死。"),
-        Poetry("风急天高猿啸哀，渚清沙白鸟飞回", "登高·杜甫",
-            "风急天高猿啸哀，渚清沙白鸟飞回。\n无边落木萧萧下，不尽长江滚滚来。\n万里悲秋常作客，百年多病独登台。\n艰难苦恨繁霜鬓，潦倒新停浊酒杯。"),
-        Poetry("大江东去，浪淘尽，千古风流人物", "念奴娇·苏轼",
-            "大江东去，浪淘尽，千古风流人物。\n故垒西边，人道是，三国周郎赤壁。\n乱石穿空，惊涛拍岸，卷起千堆雪。\n江山如画，一时多少豪杰。\n遥想公瑾当年，小乔初嫁了，雄姿英发。\n羽扇纶巾，谈笑间，樯橹灰飞烟灭。\n故国神游，多情应笑我，早生华发。\n人生如梦，一尊还酹江月。"),
-        Poetry("怒发冲冠，凭栏处、潇潇雨歇", "满江红·岳飞",
-            "怒发冲冠，凭栏处、潇潇雨歇。\n抬望眼、仰天长啸，壮怀激烈。\n三十功名尘与土，八千里路云和月。\n莫等闲、白了少年头，空悲切。\n靖康耻，犹未雪。臣子恨，何时灭。\n驾长车，踏破贺兰山缺。\n壮志饥餐胡虏肉，笑谈渴饮匈奴血。\n待从头、收拾旧山河，朝天阙。"),
-        Poetry("醉里挑灯看剑，梦回吹角连营", "破阵子·辛弃疾",
-            "醉里挑灯看剑，梦回吹角连营。\n八百里分麾下炙，五十弦翻塞外声。\n沙场秋点兵。\n马作的卢飞快，弓如霹雳弦惊。\n了却君王天下事，赢得生前身后名。\n可怜白发生！"),
-    )
-
-    // ═══ 雾天 ═══
-    private val FOG_POEMS = listOf(
-        Poetry("日照香炉生紫烟，遥看瀑布挂前川", "望庐山瀑布·李白",
-            "日照香炉生紫烟，\n遥看瀑布挂前川。\n飞流直下三千尺，\n疑是银河落九天。"),
-        Poetry("月落乌啼霜满天，江枫渔火对愁眠", "枫桥夜泊·张继",
-            "月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。"),
-        Poetry("烟笼寒水月笼沙，夜泊秦淮近酒家", "泊秦淮·杜牧",
-            "烟笼寒水月笼沙，\n夜泊秦淮近酒家。\n商女不知亡国恨，\n隔江犹唱后庭花。"),
-        Poetry("花非花，雾非雾，夜半来，天明去", "花非花·白居易",
-            "花非花，雾非雾。\n夜半来，天明去。\n来如春梦几多时？\n去似朝云无觅处。"),
-        Poetry("山重水复疑无路，柳暗花明又一村", "游山西村·陆游",
-            "莫笑农家腊酒浑，丰年留客足鸡豚。\n山重水复疑无路，柳暗花明又一村。\n箫鼓追随春社近，衣冠简朴古风存。\n从今若许闲乘月，拄杖无时夜叩门。"),
-        Poetry("横看成岭侧成峰，远近高低各不同", "题西林壁·苏轼",
-            "横看成岭侧成峰，\n远近高低各不同。\n不识庐山真面目，\n只缘身在此山中。"),
-    )
-
-    // ═══ 春天 ═══
-    private val SPRING_POEMS = listOf(
-        Poetry("竹外桃花三两枝，春江水暖鸭先知", "惠崇春江晚景·苏轼",
-            "竹外桃花三两枝，\n春江水暖鸭先知。\n蒌蒿满地芦芽短，\n正是河豚欲上时。"),
-        Poetry("等闲识得东风面，万紫千红总是春", "春日·朱熹",
-            "胜日寻芳泗水滨，\n无边光景一时新。\n等闲识得东风面，\n万紫千红总是春。"),
-        Poetry("春眠不觉晓，处处闻啼鸟", "春晓·孟浩然",
-            "春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。"),
-        Poetry("人间四月芳菲尽，山寺桃花始盛开", "大林寺桃花·白居易",
-            "人间四月芳菲尽，\n山寺桃花始盛开。\n长恨春归无觅处，\n不知转入此中来。"),
+    /** 内置最小 fallback（防止 assets 加载失败时无诗可用） */
+    private val FALLBACK_POEMS = listOf(
         Poetry("春风又绿江南岸，明月何时照我还", "泊船瓜洲·王安石",
             "京口瓜洲一水间，\n钟山只隔数重山。\n春风又绿江南岸，\n明月何时照我还。"),
-        Poetry("满园春色关不住，一枝红杏出墙来", "游园不值·叶绍翁",
-            "应怜屐齿印苍苔，\n小扣柴扉久不开。\n春色满园关不住，\n一枝红杏出墙来。"),
-        Poetry("草长莺飞二月天，拂堤杨柳醉春烟", "村居·高鼎",
-            "草长莺飞二月天，\n拂堤杨柳醉春烟。\n儿童散学归来早，\n忙趁东风放纸鸢。"),
-        Poetry("不知细叶谁裁出，二月春风似剪刀", "咏柳·贺知章",
-            "碧玉妆成一树高，\n万条垂下绿丝绦。\n不知细叶谁裁出，\n二月春风似剪刀。"),
-    )
-
-    // ═══ 夏天 ═══
-    private val SUMMER_POEMS = listOf(
-        Poetry("小荷才露尖尖角，早有蜻蜓立上头", "小池·杨万里",
-            "泉眼无声惜细流，\n树阴照水爱晴柔。\n小荷才露尖尖角，\n早有蜻蜓立上头。"),
-        Poetry("稻花香里说丰年，听取蛙声一片", "西江月·辛弃疾",
-            "明月别枝惊鹊，清风半夜鸣蝉。\n稻花香里说丰年，听取蛙声一片。\n七八个星天外，两三点雨山前。\n旧时茅店社林边，路转溪桥忽见。"),
-        Poetry("接天莲叶无穷碧，映日荷花别样红", "晓出净慈寺送林子方·杨万里",
-            "毕竟西湖六月中，\n风光不与四时同。\n接天莲叶无穷碧，\n映日荷花别样红。"),
-        Poetry("黄梅时节家家雨，青草池塘处处蛙", "约客·赵师秀",
-            "黄梅时节家家雨，\n青草池塘处处蛙。\n有约不来过夜半，\n闲敲棋子落灯花。"),
-        Poetry("绿树阴浓夏日长，楼台倒影入池塘", "山亭夏日·高骈",
-            "绿树阴浓夏日长，\n楼台倒影入池塘。\n水晶帘动微风起，\n满架蔷薇一院香。"),
-        Poetry("梅子黄时日日晴，小溪泛尽却山行", "三衢道中·曾几",
-            "梅子黄时日日晴，\n小溪泛尽却山行。\n绿阴不减来时路，\n添得黄鹂四五声。"),
-    )
-
-    // ═══ 秋天 ═══
-    private val AUTUMN_POEMS = listOf(
-        Poetry("停车坐爱枫林晚，霜叶红于二月花", "山行·杜牧",
-            "远上寒山石径斜，\n白云生处有人家。\n停车坐爱枫林晚，\n霜叶红于二月花。"),
-        Poetry("自古逢秋悲寂寥，我言秋日胜春朝", "秋词·刘禹锡",
-            "自古逢秋悲寂寥，\n我言秋日胜春朝。\n晴空一鹤排云上，\n便引诗情到碧霄。"),
-        Poetry("落霞与孤鹜齐飞，秋水共长天一色", "滕王阁序·王勃"),
-        Poetry("明月几时有，把酒问青天", "水调歌头·苏轼",
-            "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n我欲乘风归去，又恐琼楼玉宇，高处不胜寒。\n起舞弄清影，何似在人间。\n转朱阁，低绑户，照无眠。\n不应有恨，何事长向别时圆？\n人有悲欢离合，月有阴晴圆缺，此事古难全。\n但愿人长久，千里共婵娟。"),
-        Poetry("枯藤老树昏鸦，小桥流水人家", "天净沙·马致远",
-            "枯藤老树昏鸦，\n小桥流水人家，\n古道西风瘦马。\n夕阳西下，\n断肠人在天涯。"),
-        Poetry("无边落木萧萧下，不尽长江滚滚来", "登高·杜甫",
-            "风急天高猿啸哀，渚清沙白鸟飞回。\n无边落木萧萧下，不尽长江滚滚来。\n万里悲秋常作客，百年多病独登台。\n艰难苦恨繁霜鬓，潦倒新停浊酒杯。"),
-        Poetry("一年好景君须记，最是橙黄橘绿时", "赠刘景文·苏轼",
-            "荷尽已无擎雨盖，\n菊残犹有傲霜枝。\n一年好景君须记，\n最是橙黄橘绿时。"),
-    )
-
-    // ═══ 冬天 ═══
-    private val WINTER_POEMS = listOf(
-        Poetry("墙角数枝梅，凌寒独自开", "梅花·王安石",
-            "墙角数枝梅，凌寒独自开。\n遥知不是雪，为有暗香来。"),
-        Poetry("千山鸟飞绝，万径人踪灭", "江雪·柳宗元",
-            "千山鸟飞绝，万径人踪灭。\n孤舟蓑笠翁，独钓寒江雪。"),
-        Poetry("晚来天欲雪，能饮一杯无", "问刘十九·白居易",
-            "绿蚁新醅酒，红泥小火炉。\n晚来天欲雪，能饮一杯无？"),
-        Poetry("不经一番寒彻骨，怎得梅花扑鼻香", "上堂开示颂·黄蘖禅师",
-            "尘劳迥脱事非常，\n紧把绳头做一场。\n不经一番寒彻骨，\n怎得梅花扑鼻香。"),
-        Poetry("爆竹声中一岁除，春风送暖入屠苏", "元日·王安石",
-            "爆竹声中一岁除，\n春风送暖入屠苏。\n千门万户曈曈日，\n总把新桃换旧符。"),
-        Poetry("疏影横斜水清浅，暗香浮动月黄昏", "山园小梅·林逋",
-            "众芳摇落独暄妍，占尽风情向小园。\n疏影横斜水清浅，暗香浮动月黄昏。\n霜禽欲下先偷眼，粉蝶如知合断魂。\n幸有微吟可相狎，不须檀板共金樽。"),
+        Poetry("海内存知己，天涯若比邻", "送杜少府之任蜀州·王勃",
+            "城阙辅三秦，风烟望五津。\n与君离别意，同是宦游人。\n海内存知己，天涯若比邻。\n无为在歧路，儿女共沾巾。"),
+        Poetry("会当凌绝顶，一览众山小", "望岳·杜甫",
+            "岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n荡胸生曾云，决眦入归鸟。\n会当凌绝顶，一览众山小。"),
+        Poetry("但愿人长久，千里共婵娟", "水调歌头·苏轼",
+            "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n但愿人长久，千里共婵娟。"),
+        Poetry("长风破浪会有时，直挂云帆济沧海", "行路难·李白",
+            "行路难，行路难，多歧路，今安在？\n长风破浪会有时，直挂云帆济沧海。"),
     )
 }
