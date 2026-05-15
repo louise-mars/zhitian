@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.weathercalendar.data.repository.TemperatureUnit
@@ -46,6 +47,7 @@ import com.weathercalendar.data.repository.ThemeMode
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit = {},
+    onPoetryFavorites: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,6 +81,25 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
+
+            // ── 我的诗集 ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPoetryFavorites() }
+                    .padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("📖", fontSize = 20.sp)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("我的诗集", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text("收藏的古诗词", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
 
             // ── 温度单位 ──
             SectionTitle("温度单位")

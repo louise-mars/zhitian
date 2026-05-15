@@ -32,6 +32,7 @@ object Routes {
     const val HOME = "home"
     const val CALENDAR = "calendar"
     const val SETTINGS = "settings"
+    const val POETRY_FAVORITES = "poetry_favorites"
 }
 
 @Composable
@@ -150,6 +151,19 @@ fun WeatherCalendarNavHost() {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onPoetryFavorites = { navController.navigate(Routes.POETRY_FAVORITES) },
+            )
+        }
+
+        // ── 诗词收藏夹 ──
+        composable(Routes.POETRY_FAVORITES) {
+            val viewModel: com.weathercalendar.ui.poetry.PoetryFavoritesViewModel = hiltViewModel()
+            val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+
+            com.weathercalendar.ui.poetry.PoetryFavoritesScreen(
+                favorites = favorites,
+                onBack = { navController.popBackStack() },
+                onDelete = { viewModel.removeFavorite(it) },
             )
         }
     }
