@@ -3,7 +3,11 @@ package com.weathercalendar.ui.calendar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
@@ -93,7 +97,7 @@ fun CalendarScreen(
     onDeleteEvent: (Long) -> Unit = {},
     onUpdateEvent: (Long, LocalDate, String, String, java.time.LocalTime?, Int?, Long, String?) -> Unit = { _, _, _, _, _, _, _, _ -> },
 ) {
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var swipeDirection by remember { mutableIntStateOf(0) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
@@ -439,6 +443,23 @@ private fun DayCellView(
         spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessHigh), label = "s",
     )
 
+    // Pulsing animation for today's cell
+    val pulseScale = if (isToday) {
+        val infiniteTransition = rememberInfiniteTransition(label = "todayPulse")
+        val pulse by infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.08f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2000),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "pulseScale",
+        )
+        pulse
+    } else {
+        1f
+    }
+
     // 背景
     val bg = when {
         isToday && isSelected -> Color(0xFFEF5350)
@@ -471,7 +492,7 @@ private fun DayCellView(
 
     Column(
         modifier = modifier
-            .scale(scale)
+            .scale(scale * pulseScale)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClick)

@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -127,6 +129,12 @@ fun HomeScreen(
         }
     }
 
+    // 卡片入场动画
+    var cardsVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(isLoading) {
+        if (!isLoading && hourlyForecast.isNotEmpty()) cardsVisible = true
+    }
+
     PullToRefreshBox(isRefreshing = isLoading, onRefresh = onRefresh) {
         Box(
             modifier = Modifier.fillMaxSize()
@@ -188,6 +196,14 @@ fun HomeScreen(
                         Spacer(Modifier.height(10.dp))
 
                         // 天气卡
+                        AnimatedVisibility(
+                            visible = cardsVisible,
+                            enter = slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(durationMillis = 400, delayMillis = 0),
+                            ) + fadeIn(animationSpec = tween(durationMillis = 400, delayMillis = 0)),
+                        ) {
+                            Column {
                         if (threeDays.isNotEmpty()) {
                             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth()) { page ->
                                 val day = threeDays[page]
@@ -211,6 +227,8 @@ fun HomeScreen(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
                         }
+                            }
+                        }
 
                         Spacer(Modifier.height(12.dp))
 
@@ -225,6 +243,13 @@ fun HomeScreen(
                             )
                         } ?: currentWeather
 
+                        AnimatedVisibility(
+                            visible = cardsVisible,
+                            enter = slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(durationMillis = 400, delayMillis = 60),
+                            ) + fadeIn(animationSpec = tween(durationMillis = 400, delayMillis = 60)),
+                        ) {
                         SmartAdviceCard(
                             currentWeather = focusedWeather,
                             todayInfo = focusedDay ?: threeDays.firstOrNull(),
@@ -232,21 +257,38 @@ fun HomeScreen(
                             textColor = textColor,
                             modifier = Modifier.padding(horizontal = 20.dp),
                         )
+                        }
 
                         Spacer(Modifier.height(10.dp))
 
                         // 每日诗词
+                        AnimatedVisibility(
+                            visible = cardsVisible,
+                            enter = slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(durationMillis = 400, delayMillis = 120),
+                            ) + fadeIn(animationSpec = tween(durationMillis = 400, delayMillis = 120)),
+                        ) {
                         DailyPoetryCard(
                             date = focusedDay?.date ?: LocalDate.now(),
                             condition = focusedCondition,
                             textColor = textColor,
                             modifier = Modifier.padding(horizontal = 20.dp),
                         )
+                        }
 
                         Spacer(Modifier.height(12.dp))
 
                         // ═══ 预警区域（最醒目位置） ═══
 
+                        AnimatedVisibility(
+                            visible = cardsVisible,
+                            enter = slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(durationMillis = 400, delayMillis = 180),
+                            ) + fadeIn(animationSpec = tween(durationMillis = 400, delayMillis = 180)),
+                        ) {
+                            Column {
                         // 气象灾害预警（气象局官方，最高优先级）
                         if (pagerState.currentPage == 0 && warnings.isNotEmpty()) {
                             WeatherWarningCard(warnings = warnings, modifier = Modifier.padding(horizontal = 20.dp))
@@ -269,6 +311,8 @@ fun HomeScreen(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                             )
                             Spacer(Modifier.height(10.dp))
+                        }
+                            }
                         }
 
                         // ═══ 信息区域 ═══

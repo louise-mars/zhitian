@@ -3,12 +3,20 @@ package com.weathercalendar.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -29,7 +38,7 @@ import com.weathercalendar.util.DailyPoetry
 import java.time.LocalDate
 
 /**
- * 每日诗词卡片 — 点击展开完整诗词，支持收藏。
+ * 每日诗词卡片 — 支持左右滑动探索多首诗词，点击展开完整诗词，支持收藏。
  */
 @Composable
 fun DailyPoetryCard(
@@ -40,12 +49,59 @@ fun DailyPoetryCard(
     isFavorite: Boolean = false,
     onFavoriteToggle: (() -> Unit)? = null,
 ) {
-    val poetry = DailyPoetry.getPoetry(date, condition)
+    val pageCount = 5
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            val poetryDate = date.plusDays(page.toLong())
+            val poetry = DailyPoetry.getPoetry(poetryDate, condition)
+            PoetryPageContent(
+                poetry = poetry,
+                isFavorite = isFavorite && page == 0,
+                onFavoriteToggle = if (page == 0) onFavoriteToggle else null,
+            )
+        }
+
+        // Page indicator dots
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            repeat(pageCount) { index ->
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (index == pagerState.currentPage) 6.dp else 4.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (index == pagerState.currentPage) Color(0xFFF5E6C8)
+                            else Color(0xFFF5E6C8).copy(alpha = 0.3f)
+                        ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PoetryPageContent(
+    poetry: DailyPoetry.Poetry,
+    isFavorite: Boolean = false,
+    onFavoriteToggle: (() -> Unit)? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     val hasFullText = poetry.fullText.isNotBlank()
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .then(if (hasFullText) Modifier.clickable { expanded = !expanded } else Modifier)
             .padding(horizontal = 4.dp),

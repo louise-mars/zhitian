@@ -17,18 +17,23 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
- * 骨架屏 — 加载时显示 shimmer 动画占位。
+ * 骨架屏 — 加载时显示 shimmer 动画占位 + 居中诗词。
  */
 @Composable
 fun SkeletonScreen(textColor: Color) {
@@ -53,66 +58,61 @@ fun SkeletonScreen(textColor: Color) {
         end = Offset(shimmerOffset, 0f),
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(20.dp),
-    ) {
-        // Header placeholder
-        ShimmerBox(
-            brush = shimmerBrush,
-            width = 120.dp,
-            height = 24.dp,
-            cornerRadius = 8.dp,
-        )
-        Spacer(Modifier.height(8.dp))
-        ShimmerBox(
-            brush = shimmerBrush,
-            width = 180.dp,
-            height = 16.dp,
-            cornerRadius = 6.dp,
-        )
+    // 诗词列表（每小时轮换）
+    val verses = listOf(
+        "春风得意马蹄疾，一日看尽长安花",
+        "大漠孤烟直，长河落日圆",
+        "海上生明月，天涯共此时",
+        "落霞与孤鹜齐飞，秋水共长天一色",
+        "千里莺啼绿映红，水村山郭酒旗风",
+    )
+    val verseIndex = (System.currentTimeMillis() / 3600000 % 5).toInt()
 
-        Spacer(Modifier.height(24.dp))
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Shimmer skeleton background
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(20.dp),
+        ) {
+            // Header placeholder
+            ShimmerBox(brush = shimmerBrush, width = 120.dp, height = 24.dp, cornerRadius = 8.dp)
+            Spacer(Modifier.height(8.dp))
+            ShimmerBox(brush = shimmerBrush, width = 180.dp, height = 16.dp, cornerRadius = 6.dp)
+            Spacer(Modifier.height(24.dp))
+            ShimmerBox(brush = shimmerBrush, fillWidth = true, height = 160.dp, cornerRadius = 24.dp)
+            Spacer(Modifier.height(16.dp))
+            ShimmerBox(brush = shimmerBrush, fillWidth = true, height = 40.dp, cornerRadius = 12.dp)
+            Spacer(Modifier.height(16.dp))
+            ShimmerBox(brush = shimmerBrush, fillWidth = true, height = 80.dp, cornerRadius = 16.dp)
+            Spacer(Modifier.height(16.dp))
+            ShimmerBox(brush = shimmerBrush, fillWidth = true, height = 120.dp, cornerRadius = 16.dp)
+        }
 
-        // Weather card placeholder
-        ShimmerBox(
-            brush = shimmerBrush,
-            fillWidth = true,
-            height = 160.dp,
-            cornerRadius = 24.dp,
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Advice placeholder
-        ShimmerBox(
-            brush = shimmerBrush,
-            fillWidth = true,
-            height = 40.dp,
-            cornerRadius = 12.dp,
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Hourly row placeholder
-        ShimmerBox(
-            brush = shimmerBrush,
-            fillWidth = true,
-            height = 80.dp,
-            cornerRadius = 16.dp,
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Forecast placeholder
-        ShimmerBox(
-            brush = shimmerBrush,
-            fillWidth = true,
-            height = 120.dp,
-            cornerRadius = 16.dp,
-        )
+        // Centered poetry overlay
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        ) {
+            Text(
+                text = verses[verseIndex],
+                fontSize = 20.sp,
+                color = Color(0xFFF5E6C8),
+                fontFamily = FontFamily.Serif,
+                textAlign = TextAlign.Center,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(horizontal = 32.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "— 知天",
+                fontSize = 13.sp,
+                color = Color(0xFFF5E6C8).copy(alpha = 0.4f),
+                fontFamily = FontFamily.Serif,
+            )
+        }
     }
 }
 

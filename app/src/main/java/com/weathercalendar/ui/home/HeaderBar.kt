@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -24,7 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.weathercalendar.ui.theme.WeatherCalendarTheme
+import java.util.Calendar
 
 /**
  * 首页顶部栏：城市选择 + 日期农历 + 日历/设置按钮
@@ -77,6 +80,12 @@ fun HeaderBar(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = getTimeGreeting(),
+                color = textColor.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+            )
         }
 
         // 右侧：分享 + 日历 + 设置
@@ -106,6 +115,19 @@ fun HeaderBar(
                 )
             }
         }
+    }
+}
+
+private fun getTimeGreeting(): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hour) {
+        in 6..8 -> "早安，新的一天开始了"
+        in 9..10 -> "上午好"
+        in 11..12 -> "午间小憩"
+        in 13..16 -> "下午好"
+        in 17..18 -> "傍晚好，记得添衣"
+        in 19..21 -> "晚上好"
+        else -> "夜深了，早点休息"
     }
 }
 

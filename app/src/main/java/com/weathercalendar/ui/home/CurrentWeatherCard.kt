@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -56,10 +58,17 @@ fun CurrentWeatherCard(
             // 温度
             Text(
                 text = weather.temperature.formatTempShort(tempUnit),
-                color = textColor,
-                fontSize = 60.sp,
-                fontWeight = FontWeight.Light,
-                letterSpacing = 2.sp,
+                style = TextStyle(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            textColor,
+                            textColor.copy(alpha = 0.7f),
+                        ),
+                    ),
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Thin,
+                    letterSpacing = 2.sp,
+                ),
             )
 
             Spacer(Modifier.height(2.dp))
