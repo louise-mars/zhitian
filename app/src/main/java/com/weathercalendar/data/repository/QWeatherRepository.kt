@@ -26,6 +26,9 @@ import javax.inject.Singleton
 class QWeatherRepository @Inject constructor(
     private val api: QWeatherApi,
 ) {
+    /** 记住 AQI 是否可用（免费版返回 403 后不再重试） */
+    @Volatile
+    private var aqiAvailable = true
     suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherData> {
         val location = "%.2f,%.2f".format(longitude, latitude)
 
@@ -43,6 +46,7 @@ class QWeatherRepository @Inject constructor(
                 }
                 val hourlyDeferred = async { api.weather24h(location) }
                 val aqiDeferred = async {
+                    if (!aqiAvailable) return@async null
                     try {
                         val airResp = api.airNow(location)
                         if (airResp.code == "200" && airResp.now != null) {
@@ -54,7 +58,10 @@ class QWeatherRepository @Inject constructor(
                                 pm10 = airResp.now!!.pm10,
                                 color = aqiColor(aqi),
                             )
-                        } else null
+                        } else {
+                            if (airResp.code == "403") aqiAvailable = false
+                            null
+                        }
                     } catch (_: Exception) { null }
                 }
                 val indicesDeferred = async {

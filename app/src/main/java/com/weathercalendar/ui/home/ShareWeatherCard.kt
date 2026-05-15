@@ -52,9 +52,9 @@ fun shareWeatherImage(
     currentWeather: CurrentWeather,
     lunarText: String,
 ) {
-    val width = 1080
-    val height = 1440
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val width = 720
+    val height = 960
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
     val canvas = Canvas(bitmap)
 
     // Draw gradient background
@@ -73,40 +73,40 @@ fun shareWeatherImage(
     }
 
     // City name
-    textPaint.textSize = 48f * 3
+    textPaint.textSize = 96f
     textPaint.textAlign = Paint.Align.LEFT
-    canvas.drawText(cityName, 80f, 150f, textPaint)
+    canvas.drawText(cityName, 50f, 100f, textPaint)
 
     // Date
-    textPaint.textSize = 32f * 3
+    textPaint.textSize = 64f
     textPaint.alpha = 180
-    canvas.drawText("$dateText · $lunarText", 80f, 230f, textPaint)
+    canvas.drawText("$dateText · $lunarText", 50f, 160f, textPaint)
 
     // Weather emoji
-    textPaint.textSize = 120f * 3
+    textPaint.textSize = 200f
     textPaint.alpha = 255
     textPaint.textAlign = Paint.Align.CENTER
-    canvas.drawText(currentWeather.condition.icon, width / 2f, 550f, textPaint)
+    canvas.drawText(currentWeather.condition.icon, width / 2f, 380f, textPaint)
 
     // Temperature
-    textPaint.textSize = 144f * 3
+    textPaint.textSize = 280f
     textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-    canvas.drawText("${currentWeather.temperature}°", width / 2f, 900f, textPaint)
+    canvas.drawText("${currentWeather.temperature}°", width / 2f, 620f, textPaint)
 
     // Condition label
-    textPaint.textSize = 36f * 3
-    canvas.drawText(currentWeather.condition.label, width / 2f, 1020f, textPaint)
+    textPaint.textSize = 72f
+    canvas.drawText(currentWeather.condition.label, width / 2f, 700f, textPaint)
 
     // Feels like
-    textPaint.textSize = 28f * 3
+    textPaint.textSize = 56f
     textPaint.alpha = 180
-    canvas.drawText("体感 ${currentWeather.feelsLike}°", width / 2f, 1100f, textPaint)
+    canvas.drawText("体感 ${currentWeather.feelsLike}°", width / 2f, 760f, textPaint)
 
     // Branding
-    textPaint.textSize = 24f * 3
+    textPaint.textSize = 48f
     textPaint.alpha = 128
     textPaint.textAlign = Paint.Align.RIGHT
-    canvas.drawText("— 知天", width - 80f, height - 80f, textPaint)
+    canvas.drawText("— 知天", width - 50f, height - 50f, textPaint)
 
     // Save to cache/share/ subdirectory (restricted by FileProvider)
     val shareDir = File(context.cacheDir, "share").also { it.mkdirs() }

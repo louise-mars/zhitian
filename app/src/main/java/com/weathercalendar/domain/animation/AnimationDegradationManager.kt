@@ -1,5 +1,6 @@
 package com.weathercalendar.domain.animation
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -13,9 +14,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 动画降级管理器 — 根据电量和省电模式自动降级动画。
+ * 动画降级管理器 — 根据电量、省电模式和设备性能自动降级动画。
  *
  * 降级规则：
+ * - 低内存设备（isLowRamDevice）：始终禁用动画
  * - 电量 < 15%：禁用图标动画，转场缩短到 200ms
  * - 省电模式：禁用图标动画，转场即时切换（0ms）
  * - 电量 > 20% 且非省电：恢复全动画
@@ -32,17 +34,33 @@ class AnimationDegradationManager @Inject constructor(
     )
 
     enum class DegradationReason {
-        NONE, LOW_BATTERY, POWER_SAVING
+        NONE, LOW_BATTERY, POWER_SAVING, LOW_DEVICE
     }
 
     private val _state = MutableStateFlow(DegradationState())
     val state: StateFlow<DegradationState> = _state.asStateFlow()
+
+    /** 是否为低内存设备（只检查一次） */
+    private val isLowRamDevice: Boolean by lazy {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        am?.isLowRamDevice ?: false
+    }
 
     /**
      * 检查当前电量和省电模式，更新降级状态。
      * 在 App resume 时调用。
      */
     fun checkAndUpdate() {
+        // 低内存设备始终降级
+        if (isLowRamDevice) {
+            _state.value = DegradationState(
+                iconAnimationEnabled = false,
+                transitionDuration = 200,
+                reason = DegradationReason.LOW_DEVICE,
+            )
+            return
+        }
+
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isPowerSaving = powerManager?.isPowerSaveMode ?: false
 
